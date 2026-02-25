@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elegrow M.O.M Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="brand-header animate-in">
+        <div class="brand-logo-wrap">
+          <img
+            id="brandLogoFull"
+            class="logo-full"
+            src="/assets/elegrow-logo-full.png"
+            alt="Elegrow Technology"
+            onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex';"
+          />
+          <div id="logoFallback" class="logo-fallback" style="display: none">
+            <div class="logo-mark"></div>
+            <div>
+              <h1>ELEGROW TECHNOLOGY</h1>
+              <p>WE SHARE, CARE, RESOLVE &amp; UPGRADE</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="brand-contact">
+          <span>Need help?</span>
+          <strong>info@elegrow.com</strong>
+        </div>
+      </header>
+
+      <nav class="app-nav animate-in">
+        <button id="navDashboardBtn" class="nav-chip nav-chip-active" type="button">Dashboard</button>
+        <button id="navEditorBtn" class="nav-chip" type="button">M.O.M Editor</button>
+        <button id="startNewMomBtn" class="btn btn-primary" type="button">+ New M.O.M Sheet</button>
+      </nav>
+
+      <section id="dashboardView" class="view view-active">
+        <section class="dashboard-hero animate-in">
+          <div>
+            <p class="hero-eyebrow">TECHNICAL SERVICES</p>
+            <h2>Project Dashboard</h2>
+            <p>
+              Manage your meeting records with branded, standardized M.O.M sheets connected to Zoho Projects.
+            </p>
+            <button id="startNewMomHeroBtn" class="btn btn-primary" type="button">Start New M.O.M</button>
+          </div>
+          <div class="hero-mark" aria-hidden="true"></div>
+        </section>
+
+        <div class="kpi-grid animate-in">
+          <article class="kpi-card">
+            <p>Total M.O.M Submitted</p>
+            <h3 id="kpiTotalMom">0</h3>
+          </article>
+          <article class="kpi-card">
+            <p>Zoho Integration</p>
+            <h3 id="kpiZohoMode">Checking...</h3>
+          </article>
+          <article class="kpi-card">
+            <p>Email Service</p>
+            <h3 id="kpiEmailMode">Checking...</h3>
+          </article>
+        </div>
+
+        <section class="dashboard-search-panel animate-in">
+          <label for="dashboardSearchInput">Search Projects (Name)</label>
+          <input id="dashboardSearchInput" type="text" placeholder="Search by project name..." />
+        </section>
+
+        <section class="project-list-panel panel animate-in dashboard-projects-panel">
+          <div class="panel-head">
+            <h2>Recent Zoho Projects (Added / Modified)</h2>
+          </div>
+          <p id="zohoListStatus" class="zoho-list-status">Loading projects...</p>
+          <div id="dashboardRecentProjects" class="recent-project-grid"></div>
+        </section>
+
+        <section class="panel workflow-panel animate-in">
+          <h2>Workflow</h2>
+          <ol>
+            <li>Click <strong>New M.O.M Sheet</strong>.</li>
+            <li>Choose source: <strong>Manual Entry</strong> or <strong>From Zoho Projects</strong>.</li>
+            <li>Fill meeting details, minutes, agenda, and attendees.</li>
+            <li>Submit with one or more options: email, PDF, print.</li>
+          </ol>
+        </section>
+      </section>
+
+      <section id="editorView" class="view">
+        <header class="editor-header animate-in">
+          <div>
+            <p class="hero-eyebrow">M.O.M WORKSPACE</p>
+            <h2>Minutes of Meeting (M.O.M)</h2>
+            <p>Based on your provided M.O.M sheet format</p>
+          </div>
+          <div class="editor-actions">
+            <button id="backToDashboardBtn" class="btn btn-light" type="button">Dashboard</button>
+            <button id="newMomBtn" class="btn btn-primary" type="button">New M.O.M Sheet</button>
+          </div>
+        </header>
+
+        <form id="momForm" class="mom-form">
+          <section class="panel">
+            <h2>1. General Information</h2>
+            <p id="projectEntryHint" class="project-entry-hint">Project details source: Zoho Projects</p>
+            <div id="zohoProjectPickerRow" class="zoho-picker-row">
+              <label>
+                Zoho Project (Project Number / Name)
+                <select id="zohoProjectSelect">
+                  <option value="">Select a Zoho project</option>
+                </select>
+              </label>
+              <p class="zoho-sync-note">
+                Synced from Zoho on selection: Project Name, Project Number/Work Order, Client Name, and
+                Project Users for Elegrow attendee dropdown (only @elegrow.com users).
+              </p>
+            </div>
+            <div class="grid grid-2">
+              <label>
+                Meeting Title
+                <input id="meetingTitle" name="meetingTitle" type="text" required />
+              </label>
+              <label>
+                Project Name
+                <input id="projectName" name="projectName" type="text" readonly />
+              </label>
+              <label>
+                Project No / Work Order No
+                <input id="projectNoWorkOrderNo" name="projectNoWorkOrderNo" type="text" readonly />
+              </label>
+              <label>
+                Client Name
+                <input id="clientName" name="clientName" type="text" readonly />
+              </label>
+              <label>
+                Meeting Date
+                <input id="meetingDate" name="meetingDate" type="date" required />
+              </label>
+              <label>
+                Meeting Time
+                <input id="meetingTime" name="meetingTime" type="time" />
+              </label>
+              <label>
+                Entry Time
+                <input id="entryTime" name="entryTime" type="time" />
+              </label>
+              <label>
+                Exit Time
+                <input id="exitTime" name="exitTime" type="time" />
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>2. Details of Meeting</h2>
+            <div class="grid grid-2">
+              <label>
+                Meeting Location
+                <input id="meetingLocation" name="meetingLocation" type="text" required />
+              </label>
+              <label>
+                Meeting Called by
+                <select id="meetingCalledBy" name="meetingCalledBy">
+                  <option value="">Select</option>
+                  <option value="Elegrow Technology Pvt. Ltd.">Elegrow Technology Pvt. Ltd.</option>
+                  <option value="Client">Client</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="meeting-type-block">
+              <h3>Type of Meeting</h3>
+              <div class="meeting-type-grid">
+                <label class="check-item"
+                  ><input type="checkbox" name="meetingType" value="Kick-off" />
+                  <span>Kick-off</span></label
+                >
+                <label class="check-item"
+                  ><input type="checkbox" name="meetingType" value="Technical Discussion" />
+                  <span>Technical Discussion</span></label
+                >
+                <label class="check-item"
+                  ><input type="checkbox" name="meetingType" value="Status/Review" />
+                  <span>Status/Review</span></label
+                >
+                <label class="check-item"
+                  ><input type="checkbox" name="meetingType" value="Day/Project Closing" />
+                  <span>Day/Project Closing</span></label
+                >
+                <label class="check-item"
+                  ><input type="checkbox" name="meetingType" value="Others" /> <span>Others</span></label
+                >
+              </div>
+              <label class="meeting-type-other">
+                Others detail
+                <input id="meetingTypeOther" name="meetingTypeOther" type="text" placeholder="If others, specify" />
+              </label>
+            </div>
+
+            <div class="grid grid-3">
+              <label>
+                Facilitator Representative
+                <input id="facilitatorRepresentative" name="facilitatorRepresentative" type="text" />
+              </label>
+              <label>
+                Elegrow Representative
+                <input id="elegrowRepresentative" name="elegrowRepresentative" type="text" />
+              </label>
+              <label>
+                Client Representative
+                <input id="clientRepresentative" name="clientRepresentative" type="text" />
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>3. Minutes</h2>
+            <label>
+              Minutes
+              <textarea id="minutes" name="minutes" rows="6" placeholder="Write complete minutes here..."></textarea>
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>4. Agenda</h2>
+              <button id="addAgendaRowBtn" class="btn btn-light" type="button">Add Agenda Row</button>
+            </div>
+            <div class="table-wrap">
+              <table id="agendaTable">
+                <thead>
+                  <tr>
+                    <th>Sr. No</th>
+                    <th>Agenda</th>
+                    <th>Action Plan</th>
+                    <th>Responsibility</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Attendees</h2>
+              <button id="addAttendeeRowBtn" class="btn btn-light" type="button">Add Attendee Row</button>
+            </div>
+            <div class="table-wrap">
+              <table id="attendeeTable">
+                <thead>
+                  <tr>
+                    <th>Sr.</th>
+                    <th>Elegrow Technology (Name)</th>
+                    <th>Client (Name)</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <label>
+              Organization Address
+              <input
+                id="organizationAddress"
+                name="organizationAddress"
+                type="text"
+                value="302, Sangini Aspire, Beside Sanskruti Township Near Pal RTO, Pal-Hajira Road, Pal Gam, Surat, Gujarat - 395009"
+              />
+            </label>
+          </section>
+
+          <footer class="form-actions">
+            <button id="submitMomBtn" class="btn btn-primary" type="submit">Submit M.O.M</button>
+          </footer>
+        </form>
+      </section>
+    </main>
+
+    <dialog id="projectSourceModal">
+      <form method="dialog" class="modal-body">
+        <h3>New M.O.M Sheet</h3>
+        <p>Choose how you want to fill project details.</p>
+        <div class="source-options">
+          <button id="chooseManualBtn" class="source-option" type="button">
+            <strong>Manual Entry</strong>
+            <span>Type project number, name, and client yourself.</span>
+          </button>
+          <button id="chooseZohoBtn" class="source-option" type="button">
+            <strong>From Zoho Projects</strong>
+            <span>Select from your organization Zoho project list.</span>
+          </button>
+        </div>
+        <menu>
+          <button type="button" class="btn btn-light" id="closeSourceModal">Cancel</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="projectModal">
+      <form method="dialog" class="modal-body">
+        <h3>Select Project from Zoho</h3>
+        <p>Enter project number or project name to fetch from Zoho Projects.</p>
+        <div class="search-row">
+          <input id="projectSearchInput" type="text" placeholder="e.g., PRJ-2026-001 or project name" />
+          <button id="searchProjectBtn" class="btn btn-primary" type="button">Search</button>
+        </div>
+        <ul id="projectResults" class="result-list"></ul>
+        <menu>
+          <button type="button" class="btn btn-light" id="closeProjectModal">Close</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="deliveryModal">
+      <form method="dialog" class="modal-body" id="deliveryForm">
+        <h3>Submit Options</h3>
+
+        <div class="option-list">
+          <label class="option-item"><input id="optGeneratePdf" type="checkbox" checked /> Generate PDF</label>
+          <label class="option-item"><input id="optPrintPdf" type="checkbox" /> Print PDF</label>
+          <label class="option-item"><input id="optSendEmail" type="checkbox" /> Mail M.O.M to Client</label>
+        </div>
+
+        <div id="emailFields" class="email-fields hidden">
+          <label>
+            To
+            <input id="emailTo" type="text" placeholder="client@example.com" />
+          </label>
+          <label>
+            Cc
+            <input id="emailCc" type="text" placeholder="team@example.com" />
+          </label>
+          <label>
+            Subject
+            <input id="emailSubject" type="text" placeholder="Minutes of Meeting" />
+          </label>
+          <label>
+            Body
+            <textarea id="emailBody" rows="4" placeholder="Email message..."></textarea>
+          </label>
+        </div>
+
+        <menu>
+          <button id="confirmSubmitBtn" class="btn btn-primary" type="button">Confirm Submit</button>
+          <button class="btn btn-light" type="button" id="cancelDelivery">Cancel</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

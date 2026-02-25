@@ -1,0 +1,4 @@
+node_modules/
+.env
+generated-pdfs/*.pdf
+npm-debug.log*
