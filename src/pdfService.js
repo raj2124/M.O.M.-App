@@ -90,8 +90,8 @@ function drawTaskTable(doc, rows) {
   const tableX = 40;
   let y = doc.y;
   const rowHeight = 28;
-  const widths = [45, 180, 170, 120];
-  const headers = ['Sr. No', 'Tasks', 'Quantity/Description', 'Status'];
+  const widths = [45, 150, 130, 110, 80];
+  const headers = ['Sr. No', 'Tasks', 'Quantity/Description', 'Remarks', 'Status'];
 
   function drawHeaderOrRow(values, isHeader = false) {
     let x = tableX;
@@ -118,7 +118,7 @@ function drawTaskTable(doc, rows) {
   drawHeaderOrRow(headers, true);
   const effectiveRows = rows && rows.length
     ? rows
-    : [{ srNo: '1', taskName: '', quantityDescription: '', status: '' }];
+    : [{ srNo: '1', taskName: '', quantityDescription: '', remarks: '', status: '' }];
 
   for (const row of effectiveRows) {
     if (y > 740) {
@@ -127,7 +127,7 @@ function drawTaskTable(doc, rows) {
       drawHeaderOrRow(headers, true);
     }
     drawHeaderOrRow(
-      [row.srNo, row.taskName || row.taskId || '', row.quantityDescription, row.status],
+      [row.srNo, row.taskName || row.taskId || '', row.quantityDescription, row.remarks, row.status],
       false
     );
   }

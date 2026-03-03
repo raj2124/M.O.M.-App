@@ -42,6 +42,7 @@ function sanitizeMomPayload(payload) {
       taskId: sanitizeString(row?.taskId),
       taskName: sanitizeString(row?.taskName),
       quantityDescription: sanitizeString(row?.quantityDescription),
+      remarks: sanitizeString(row?.remarks),
       status: sanitizeString(row?.status)
     })),
     attendeeRows: toArray(payload.attendeeRows).map((row, index) => ({

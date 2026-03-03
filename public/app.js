@@ -569,6 +569,7 @@ function addTaskRow(row = {}) {
     <td><input type="text" value="${row.srNo || index}" class="task-sr" /></td>
     <td><select class="task-name-select"></select></td>
     <td><input type="text" value="${row.quantityDescription || ''}" class="task-quantity-description" /></td>
+    <td><input type="text" value="${row.remarks || ''}" class="task-remarks" /></td>
     <td>
       <select class="task-mom-status">
         <option value="">Select</option>
@@ -1105,6 +1106,7 @@ function collectTaskRows() {
       taskId,
       taskName,
       quantityDescription: row.querySelector('.task-quantity-description')?.value || '',
+      remarks: row.querySelector('.task-remarks')?.value || '',
       status: row.querySelector('.task-mom-status')?.value || ''
     };
   });
