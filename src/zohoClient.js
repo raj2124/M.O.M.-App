@@ -1141,12 +1141,9 @@ async function fetchProjectTasksFromZoho(projectId, options = {}) {
     let index = startIndex;
     try {
       for (let page = 0; page < maxPages; page += 1) {
-        const params = { index, range };
-        if (statusFilter) {
-          params.status = statusFilter;
-        }
-
-        const response = await requestZohoGet(endpoint, params, true);
+        // Some Zoho portals reject status query param on /tasks with 400 ("Given URL is wrong").
+        // Fetch all tasks and apply status/query filtering locally for stable behavior.
+        const response = await requestZohoGet(endpoint, { index, range }, true);
         endpointWorked = true;
         const pageTasks = collectTaskList(response.data)
           .map(normalizeTask)
