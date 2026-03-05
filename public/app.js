@@ -1,8 +1,29 @@
 const dashboardView = document.getElementById('dashboardView');
 const editorView = document.getElementById('editorView');
+const recordsView = document.getElementById('recordsView');
 const startNewMomHeroBtn = document.getElementById('startNewMomHeroBtn');
 const backToDashboardBtn = document.getElementById('backToDashboardBtn');
 const newMomBtn = document.getElementById('newMomBtn');
+const openRecordsBtnDashboard = document.getElementById('openRecordsBtnDashboard');
+const openRecordsBtnEditor = document.getElementById('openRecordsBtnEditor');
+const recordsBackDashboardBtn = document.getElementById('recordsBackDashboardBtn');
+const recordsRefreshBtn = document.getElementById('recordsRefreshBtn');
+const recordsNewMomBtn = document.getElementById('recordsNewMomBtn');
+const recordsSearchInput = document.getElementById('recordsSearchInput');
+const recordsStatus = document.getElementById('recordsStatus');
+const recordsTableBody = document.querySelector('#recordsTable tbody');
+const recordExportModal = document.getElementById('recordExportModal');
+const recordExportMeta = document.getElementById('recordExportMeta');
+const recordOptGeneratePdf = document.getElementById('recordOptGeneratePdf');
+const recordOptPrintPdf = document.getElementById('recordOptPrintPdf');
+const recordOptSendEmail = document.getElementById('recordOptSendEmail');
+const recordEmailFields = document.getElementById('recordEmailFields');
+const recordEmailTo = document.getElementById('recordEmailTo');
+const recordEmailCc = document.getElementById('recordEmailCc');
+const recordEmailSubject = document.getElementById('recordEmailSubject');
+const recordEmailBody = document.getElementById('recordEmailBody');
+const confirmRecordExportBtn = document.getElementById('confirmRecordExportBtn');
+const cancelRecordExportBtn = document.getElementById('cancelRecordExportBtn');
 
 const dashboardSearchInput = document.getElementById('dashboardSearchInput');
 const dashboardRecentProjects = document.getElementById('dashboardRecentProjects');
@@ -77,7 +98,10 @@ let currentProjectTasks = [];
 let isProjectTasksLoading = false;
 let projectTasksRequestSeq = 0;
 const projectTasksCache = new Map();
-let momGeneratedBy = 'M.O.M System';
+let momGeneratedBy = 'ETPL AI_M.O.M System';
+let recordsSearchTimer;
+let recordsCache = [];
+let activeRecordExport = null;
 
 function showToast(message, type = 'success') {
   toast.textContent = message;
@@ -90,6 +114,7 @@ function showToast(message, type = 'success') {
 function setView(viewName) {
   dashboardView.classList.toggle('view-active', viewName === 'dashboard');
   editorView.classList.toggle('view-active', viewName === 'editor');
+  recordsView.classList.toggle('view-active', viewName === 'records');
 }
 
 function getSubmittedCount() {
@@ -148,7 +173,7 @@ async function refreshHealthStatus() {
     }
 
     kpiZohoMode.textContent = data.zohoMode === 'mock' ? 'Mock Mode' : 'Live Mode';
-    momGeneratedBy = String(data.generatedBy || 'M.O.M System').trim() || 'M.O.M System';
+    momGeneratedBy = String(data.generatedBy || 'ETPL AI_M.O.M System').trim() || 'ETPL AI_M.O.M System';
     renderAuthenticityLine();
     if (data.emailMode === 'outlook-draft') {
       kpiEmailMode.textContent = 'Outlook Draft';
@@ -1075,6 +1100,166 @@ function applyDashboardFilter() {
   renderDashboardProjects(recentSubset, query);
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatRecordDateTime(value) {
+  const ms = Date.parse(String(value || ''));
+  if (Number.isNaN(ms)) {
+    return '-';
+  }
+  return new Date(ms).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function getRecordDaysLeft(record) {
+  const expiresAtMs = Date.parse(String(record?.expiresAt || ''));
+  if (Number.isNaN(expiresAtMs)) {
+    return '-';
+  }
+
+  const diffMs = expiresAtMs - Date.now();
+  if (diffMs <= 0) {
+    return '0';
+  }
+
+  const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+  return String(days);
+}
+
+function buildOutlookDraftUrlForRecord(record, options, pdfAbsoluteUrl) {
+  const to = String(options.emailTo || '').trim();
+  const cc = String(options.emailCc || '').trim();
+  const subject =
+    String(options.emailSubject || '').trim() || `Minutes of Meeting - ${record.projectName || 'Project'}`;
+  const customBody = String(options.emailBody || '').trim();
+
+  const defaultBody = [
+    'Dear Team,',
+    '',
+    `Please find the Minutes of Meeting for "${record.projectName || '-'}" below.`,
+    `PDF Link: ${pdfAbsoluteUrl}`,
+    '',
+    'Please attach the generated PDF manually before sending.',
+    '',
+    'Regards,',
+    'M.O.M App'
+  ].join('\n');
+
+  const body = customBody
+    ? `${customBody}\n\nPDF Link: ${pdfAbsoluteUrl}\n\nPlease attach the generated PDF manually before sending.`
+    : defaultBody;
+
+  const params = new URLSearchParams();
+  if (to) {
+    params.set('to', to);
+  }
+  if (cc) {
+    params.set('cc', cc);
+  }
+  params.set('subject', subject);
+  params.set('body', body);
+
+  return `https://outlook.office.com/mail/deeplink/compose?${params.toString()}`;
+}
+
+function getRecordOutputBadges(record) {
+  const output = record.output || {};
+  const badges = [];
+  if (output.generatePdf) {
+    badges.push('<span class="record-badge">PDF</span>');
+  }
+  if (output.printPdf) {
+    badges.push('<span class="record-badge">Print</span>');
+  }
+  if (output.sendEmail) {
+    badges.push('<span class="record-badge">Email</span>');
+  }
+  return badges.length ? badges.join(' ') : '<span class="record-badge">-</span>';
+}
+
+function renderRecordsTable(records) {
+  activeRecordExport = null;
+  recordsCache = Array.isArray(records) ? records : [];
+  recordsTableBody.innerHTML = '';
+
+  if (!recordsCache.length) {
+    recordsStatus.textContent = 'No M.O.M records found.';
+    return;
+  }
+
+  recordsStatus.textContent = `${recordsCache.length} record(s) found.`;
+
+  for (const record of recordsCache) {
+    const tr = document.createElement('tr');
+    const pdfUrl = String(record.pdfUrl || '').trim();
+    const daysLeft = getRecordDaysLeft(record);
+    const pdfLink = pdfUrl
+      ? `<a class="record-pdf-link" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener">Open PDF</a>`
+      : '-';
+
+    tr.innerHTML = `
+      <td>${escapeHtml(formatRecordDateTime(record.createdAt))}</td>
+      <td>${escapeHtml(record.documentId || '-')}</td>
+      <td>${escapeHtml(record.projectName || '-')}</td>
+      <td>${escapeHtml(record.meetingTitle || '-')}</td>
+      <td>${escapeHtml(record.meetingDate || '-')}</td>
+      <td>${escapeHtml(daysLeft)}</td>
+      <td class="record-output-cell">${getRecordOutputBadges(record)}</td>
+      <td>${pdfLink}</td>
+      <td class="record-actions-cell">
+        <button type="button" class="btn btn-light record-export-btn">Re-export</button>
+        <button type="button" class="btn btn-light record-delete-btn">Delete</button>
+      </td>
+    `;
+
+    tr.querySelector('.record-export-btn')?.addEventListener('click', () => {
+      openRecordExportModal(record);
+    });
+
+    tr.querySelector('.record-delete-btn')?.addEventListener('click', () => {
+      deleteRecordById(record.id);
+    });
+
+    recordsTableBody.appendChild(tr);
+  }
+}
+
+async function loadRecords(query = '', { silent = false } = {}) {
+  try {
+    if (!silent) {
+      recordsStatus.textContent = 'Loading records...';
+    }
+    const response = await fetch(`/api/mom/records?query=${encodeURIComponent(query)}`);
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load records.');
+    }
+
+    renderRecordsTable(Array.isArray(data.records) ? data.records : []);
+  } catch (error) {
+    recordsCache = [];
+    activeRecordExport = null;
+    recordsTableBody.innerHTML = '';
+    recordsStatus.textContent = error.message || 'Failed to load records.';
+    if (!silent) {
+      showToast(error.message || 'Failed to load records.', 'error');
+    }
+  }
+}
+
 function getMeetingTypes() {
   const checked = [...document.querySelectorAll('input[name="meetingType"]:checked')];
   return checked.map((item) => item.value);
@@ -1165,6 +1350,79 @@ function toggleEmailFields() {
   emailFields.classList.toggle('hidden', !optSendEmail.checked);
 }
 
+function toggleRecordEmailFields() {
+  recordEmailFields.classList.toggle('hidden', !recordOptSendEmail.checked);
+}
+
+function getRecordById(recordId) {
+  const id = String(recordId || '').trim();
+  if (!id) {
+    return null;
+  }
+  return recordsCache.find((record) => String(record.id || '') === id) || null;
+}
+
+function openRecordExportModal(record) {
+  if (!record) {
+    showToast('Record not found for export.', 'error');
+    return;
+  }
+
+  activeRecordExport = record;
+  recordOptGeneratePdf.checked = true;
+  recordOptPrintPdf.checked = false;
+  recordOptSendEmail.checked = false;
+  recordEmailTo.value = '';
+  recordEmailCc.value = '';
+  recordEmailSubject.value = `Minutes of Meeting - ${record.projectName || 'Project'}`;
+  recordEmailBody.value = '';
+  recordExportMeta.textContent = `Document ID: ${record.documentId || '-'} | Project: ${record.projectName || '-'}`;
+  toggleRecordEmailFields();
+
+  if (typeof recordExportModal.showModal === 'function') {
+    recordExportModal.showModal();
+  }
+}
+
+async function deleteRecordById(recordId) {
+  const record = getRecordById(recordId);
+  if (!record) {
+    showToast('Record not found.', 'error');
+    return;
+  }
+
+  const ok = window.confirm(`Delete record ${record.documentId || record.id}? This action cannot be undone.`);
+  if (!ok) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/mom/records/${encodeURIComponent(record.id)}`, {
+      method: 'DELETE'
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Failed to delete record.');
+    }
+    showToast('Record deleted successfully.');
+    loadRecords(recordsSearchInput.value.trim(), { silent: true });
+  } catch (error) {
+    showToast(error.message || 'Failed to delete record.', 'error');
+  }
+}
+
+function collectRecordExportOptions() {
+  return {
+    generatePdf: recordOptGeneratePdf.checked,
+    printPdf: recordOptPrintPdf.checked,
+    sendEmail: recordOptSendEmail.checked,
+    emailTo: recordEmailTo.value,
+    emailCc: recordEmailCc.value,
+    emailSubject: recordEmailSubject.value,
+    emailBody: recordEmailBody.value
+  };
+}
+
 function printPdfFromUrl(url, existingWindow = null) {
   const fullUrl = new URL(url, window.location.origin).toString();
   const printWindow = existingWindow || window.open('about:blank', '_blank');
@@ -1190,6 +1448,9 @@ function closeAllDialogs() {
   }
   if (deliveryModal.open) {
     deliveryModal.close();
+  }
+  if (recordExportModal.open) {
+    recordExportModal.close();
   }
 }
 
@@ -1232,6 +1493,24 @@ async function openZohoProjectPicker() {
 
 startNewMomHeroBtn.addEventListener('click', openProjectSourcePicker);
 newMomBtn.addEventListener('click', openProjectSourcePicker);
+openRecordsBtnDashboard.addEventListener('click', () => {
+  closeAllDialogs();
+  setView('records');
+  loadRecords(recordsSearchInput.value.trim());
+});
+openRecordsBtnEditor.addEventListener('click', () => {
+  closeAllDialogs();
+  setView('records');
+  loadRecords(recordsSearchInput.value.trim());
+});
+recordsBackDashboardBtn.addEventListener('click', () => {
+  closeAllDialogs();
+  setView('dashboard');
+});
+recordsRefreshBtn.addEventListener('click', () => {
+  loadRecords(recordsSearchInput.value.trim());
+});
+recordsNewMomBtn.addEventListener('click', openProjectSourcePicker);
 
 chooseManualBtn.addEventListener('click', () => {
   setProjectSource('manual');
@@ -1262,6 +1541,13 @@ dashboardSearchInput.addEventListener('input', () => {
   clearTimeout(dashboardSearchTimer);
   dashboardSearchTimer = setTimeout(() => {
     applyDashboardFilter();
+  }, 260);
+});
+
+recordsSearchInput.addEventListener('input', () => {
+  clearTimeout(recordsSearchTimer);
+  recordsSearchTimer = setTimeout(() => {
+    loadRecords(recordsSearchInput.value.trim(), { silent: true });
   }, 260);
 });
 
@@ -1311,6 +1597,88 @@ optSendEmail.addEventListener('change', toggleEmailFields);
 cancelDelivery.addEventListener('click', () => {
   if (deliveryModal.open) {
     deliveryModal.close();
+  }
+});
+
+recordOptSendEmail.addEventListener('change', toggleRecordEmailFields);
+cancelRecordExportBtn.addEventListener('click', () => {
+  if (recordExportModal.open) {
+    recordExportModal.close();
+  }
+});
+
+confirmRecordExportBtn.addEventListener('click', () => {
+  if (!activeRecordExport) {
+    showToast('Please select a record first.', 'error');
+    return;
+  }
+
+  const options = collectRecordExportOptions();
+  if (!options.generatePdf && !options.printPdf && !options.sendEmail) {
+    showToast('Please select at least one export option.', 'error');
+    return;
+  }
+
+  const record = activeRecordExport;
+  const pdfAbsoluteUrl =
+    String(record.pdfAbsoluteUrl || '').trim() ||
+    (record.pdfUrl ? new URL(record.pdfUrl, window.location.origin).toString() : '');
+
+  if (!pdfAbsoluteUrl) {
+    showToast('PDF URL is unavailable for this record.', 'error');
+    return;
+  }
+
+  const needsPdfWindow = Boolean(options.generatePdf || options.printPdf || options.sendEmail);
+  const preopenedPdfWindow = needsPdfWindow ? window.open('about:blank', '_blank') : null;
+  const preopenedOutlookWindow = options.sendEmail ? window.open('about:blank', '_blank') : null;
+
+  try {
+    let pdfOpened = false;
+
+    if ((options.generatePdf || options.sendEmail) && preopenedPdfWindow) {
+      preopenedPdfWindow.location.href = pdfAbsoluteUrl;
+      pdfOpened = true;
+    } else if (options.generatePdf) {
+      window.open(pdfAbsoluteUrl, '_blank', 'noopener');
+      pdfOpened = true;
+    }
+
+    if (options.printPdf) {
+      const printed = printPdfFromUrl(pdfAbsoluteUrl, preopenedPdfWindow && !pdfOpened ? preopenedPdfWindow : null);
+      pdfOpened = pdfOpened || printed;
+    }
+
+    if (options.sendEmail) {
+      const outlookUrl = buildOutlookDraftUrlForRecord(record, options, pdfAbsoluteUrl);
+      if (preopenedOutlookWindow) {
+        preopenedOutlookWindow.location.href = outlookUrl;
+      } else {
+        const win = window.open(outlookUrl, '_blank', 'noopener');
+        if (!win) {
+          showToast('Popup blocked for Outlook draft. Please allow popups and retry.', 'error');
+        }
+      }
+      if (pdfOpened) {
+        showToast('Record re-exported. Outlook draft opened with same PDF link.');
+      } else {
+        showToast('Outlook draft opened. Please attach PDF before sending.');
+      }
+    } else {
+      showToast('Record export completed.');
+    }
+
+    if (recordExportModal.open) {
+      recordExportModal.close();
+    }
+  } catch (error) {
+    if (preopenedPdfWindow) {
+      preopenedPdfWindow.close();
+    }
+    if (preopenedOutlookWindow) {
+      preopenedOutlookWindow.close();
+    }
+    showToast(error.message || 'Record export failed.', 'error');
   }
 });
 
@@ -1380,8 +1748,10 @@ confirmSubmitBtn.addEventListener('click', async () => {
       } else if (preopenedOutlookWindow) {
         preopenedOutlookWindow.location.href = outlookUrl;
       } else {
-        // Force Outlook compose in same tab instead of falling back to default mail apps.
-        window.location.href = outlookUrl;
+        const outlookWindow = window.open(outlookUrl, '_blank', 'noopener');
+        if (!outlookWindow) {
+          showToast('Popup blocked for Outlook draft. Please allow popups and retry.', 'error');
+        }
       }
 
       if (pdfOpened) {
@@ -1390,6 +1760,9 @@ confirmSubmitBtn.addEventListener('click', async () => {
         showToast('Outlook draft opened. Generate/download PDF and attach before sending.');
       }
     }
+
+    await loadRecords('', { silent: true });
+    setView('records');
   } catch (error) {
     if (preopenedPdfWindow) {
       preopenedPdfWindow.close();
@@ -1408,7 +1781,9 @@ setProjectSource('zoho');
 resetRows();
 renderAuthenticityLine();
 toggleEmailFields();
+toggleRecordEmailFields();
 refreshDashboardStats();
 refreshHealthStatus();
 setView('dashboard');
 loadDashboardProjects('');
+loadRecords('', { silent: true });

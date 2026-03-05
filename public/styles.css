@@ -731,7 +731,8 @@ body {
 }
 
 #dashboardView,
-#editorView {
+#editorView,
+#recordsView {
   margin-top: 14px;
   padding: 16px;
   border-radius: 18px;
@@ -745,6 +746,10 @@ body {
 
 #dashboardView .dashboard-hero {
   margin-top: 0;
+}
+
+#openRecordsBtnDashboard {
+  margin-left: 8px;
 }
 
 .workflow-panel {
@@ -869,6 +874,75 @@ body {
   gap: 10px;
   padding-bottom: 8px;
   border-bottom: 1px dashed #c9ddee;
+}
+
+#recordsView .records-panel {
+  border-radius: 14px;
+  border: 1px solid #b7ccdf;
+  background: linear-gradient(180deg, rgba(236, 245, 252, 0.98), rgba(221, 234, 246, 0.98));
+}
+
+.records-search-input {
+  width: min(360px, 100%);
+}
+
+.records-table-wrap {
+  border: 1px solid #c8dced;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+#recordsTable {
+  min-width: 1180px;
+}
+
+#recordsTable tbody tr:nth-child(even) {
+  background: rgba(239, 247, 255, 0.55);
+}
+
+#recordsTable tbody tr:hover {
+  background: rgba(218, 236, 250, 0.6);
+}
+
+.record-output-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.record-actions-cell {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.record-actions-cell .btn {
+  padding: 6px 9px;
+  font-size: 0.76rem;
+}
+
+.record-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  border: 1px solid #bfd4e7;
+  background: #ebf4fb;
+  color: #1c4a71;
+}
+
+.record-pdf-link {
+  color: #0d4f83;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px dashed #88b2d3;
+}
+
+.record-pdf-link:hover {
+  color: #12389b;
+  border-bottom-color: #12389b;
 }
 
 .authenticity-panel {

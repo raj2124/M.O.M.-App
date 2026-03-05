@@ -5,6 +5,7 @@ dotenv.config();
 
 const rootDir = path.resolve(__dirname, '..');
 const generatedDir = path.join(rootDir, 'generated-pdfs');
+const dataDir = path.join(rootDir, 'data');
 const appHost = process.env.APP_HOST || '127.0.0.1';
 const appPort = Number.parseInt(process.env.PORT || '3000', 10);
 
@@ -22,7 +23,13 @@ const config = {
     rootDir,
     generatedDir,
     baseUrl: process.env.APP_BASE_URL || `http://${appHost}:${appPort}`,
-    generatedBy: process.env.MOM_GENERATED_BY || 'M.O.M System'
+    generatedBy: process.env.MOM_GENERATED_BY || 'ETPL AI_M.O.M System'
+  },
+  records: {
+    dataDir,
+    filePath: process.env.MOM_RECORDS_FILE || path.join(dataDir, 'mom-records.json'),
+    retentionDays: Number.parseInt(process.env.MOM_RECORD_RETENTION_DAYS || '30', 10),
+    maxCount: Number.parseInt(process.env.MOM_RECORD_MAX_COUNT || '60', 10)
   },
   zoho: {
     useMock: toBool(process.env.ZOHO_USE_MOCK, true),

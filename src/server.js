@@ -6,8 +6,10 @@ const config = require('./config');
 const { getProjects, getProjectUsers, getProjectClientUsers, getProjectTasks } = require('./zohoClient');
 const { sanitizeMomPayload, validateMomPayload } = require('./momTemplate');
 const { generateMomPdf } = require('./pdfService');
+const { createRecordsStore } = require('./recordsStore');
 
 const app = express();
+const recordsStore = createRecordsStore(config);
 const DIGITAL_DECLARATION_STATEMENT =
   'This Minutes of Meeting (M.O.M) is a digitally generated record of meeting discussions and outcomes. It is produced from system-captured inputs and therefore does not require a handwritten signature for verification.';
 
@@ -39,7 +41,8 @@ function buildAuthenticityMetadata() {
   const generatedAtDate = new Date();
   const generatedAt = formatAuthTimestamp(generatedAtDate);
   const documentId = generateDocumentId(generatedAtDate);
-  const generatedBy = String(config.app.generatedBy || 'M.O.M System').trim() || 'M.O.M System';
+  const generatedBy =
+    String(config.app.generatedBy || 'ETPL AI_M.O.M System').trim() || 'ETPL AI_M.O.M System';
   return {
     statement: DIGITAL_DECLARATION_STATEMENT,
     documentId,
@@ -51,6 +54,27 @@ function buildAuthenticityMetadata() {
 
 if (!fs.existsSync(config.app.generatedDir)) {
   fs.mkdirSync(config.app.generatedDir, { recursive: true });
+}
+
+function safeUnlinkGeneratedPdf(fileName) {
+  const base = path.basename(String(fileName || '').trim());
+  if (!base || !base.toLowerCase().endsWith('.pdf')) {
+    return;
+  }
+  const filePath = path.join(config.app.generatedDir, base);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+}
+
+function purgeRemovedRecordPdfs(removedRecords = []) {
+  for (const record of removedRecords) {
+    try {
+      safeUnlinkGeneratedPdf(record?.pdfFileName);
+    } catch (_error) {
+      // No-op: record cleanup should not fail request lifecycle.
+    }
+  }
 }
 
 app.use(express.json({ limit: '5mb' }));
@@ -125,9 +149,11 @@ app.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     zohoMode: config.zoho.useMock ? 'mock' : 'live',
     zohoAutoRefreshConfigured,
-    generatedBy: String(config.app.generatedBy || 'M.O.M System'),
+    generatedBy: String(config.app.generatedBy || 'ETPL AI_M.O.M System'),
     emailEnabled: true,
-    emailMode: 'outlook-draft'
+    emailMode: 'outlook-draft',
+    recordsRetentionDays: recordsStore.settings.retentionDays,
+    recordsMaxCount: recordsStore.settings.maxCount
   });
 });
 
@@ -209,6 +235,55 @@ app.get('/api/zoho/projects/:projectId/tasks', async (req, res) => {
   }
 });
 
+app.get('/api/mom/records', (req, res) => {
+  try {
+    const query = String(req.query.query || '').trim();
+    const { records, removed } = recordsStore.listRecords(query);
+    purgeRemovedRecordPdfs(removed);
+
+    res.json({
+      success: true,
+      records,
+      retentionDays: recordsStore.settings.retentionDays,
+      maxCount: recordsStore.settings.maxCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to load M.O.M records.'
+    });
+  }
+});
+
+app.delete('/api/mom/records/:recordId', (req, res) => {
+  try {
+    const recordId = String(req.params.recordId || '').trim();
+    const { deleted, record, removed } = recordsStore.deleteRecord(recordId);
+    purgeRemovedRecordPdfs(removed);
+    if (deleted && record?.pdfFileName) {
+      safeUnlinkGeneratedPdf(record.pdfFileName);
+    }
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Record not found.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Record deleted.',
+      deletedRecordId: recordId
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to delete M.O.M record.'
+    });
+  }
+});
+
 app.post('/api/mom/submit', async (req, res) => {
   try {
     const mom = sanitizeMomPayload(req.body.mom || {});
@@ -245,6 +320,24 @@ app.post('/api/mom/submit', async (req, res) => {
       });
     }
 
+    const { record, removed } = recordsStore.addRecord({
+      documentId: authenticity.documentId,
+      meetingTitle: mom.meetingTitle,
+      projectName: mom.projectName,
+      projectNoWorkOrderNo: mom.projectNoWorkOrderNo,
+      clientName: mom.clientName,
+      meetingDate: mom.meetingDate,
+      output: {
+        generatePdf: Boolean(options.generatePdf),
+        printPdf: Boolean(options.printPdf),
+        sendEmail: Boolean(options.sendEmail)
+      },
+      pdfUrl,
+      pdfFileName: fileName,
+      pdfAbsoluteUrl: buildAbsolutePdfUrl(pdfUrl)
+    });
+    purgeRemovedRecordPdfs(removed);
+
     return res.json({
       success: true,
       message: 'M.O.M processed successfully.',
@@ -255,7 +348,8 @@ app.post('/api/mom/submit', async (req, res) => {
         authenticity,
         emailSent: false,
         emailDraft,
-        printRequested: Boolean(options.printPdf)
+        printRequested: Boolean(options.printPdf),
+        record
       }
     });
   } catch (error) {

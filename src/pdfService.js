@@ -6,7 +6,7 @@ const PAGE = {
   margin: 40,
   contentWidth: 515
 };
-const FOOTER_HEIGHT = 86;
+const FOOTER_HEIGHT = 92;
 
 const COLORS = {
   brandBlue: '#0f4f98',
@@ -158,8 +158,8 @@ function drawTopHeader(doc, mom, authenticity = {}) {
   doc
     .font('Helvetica-Bold')
     .fontSize(22)
-    .fillColor(COLORS.brandBlueDark)
-    .text('Minutes of Meeting (M.O.M)', x, lineY + 12, {
+    .fillColor('#000000')
+    .text('Minutes of Meeting', x, lineY + 12, {
       width: PAGE.contentWidth,
       align: 'center'
     });
@@ -369,12 +369,17 @@ function drawPageFooter(doc, mom, authenticity = {}) {
   const x = PAGE.margin;
   const statement = String(authenticity.statement || '').trim() || DIGITAL_DECLARATION_DEFAULT;
   const line = String(authenticity.line || '').trim();
+  const address = safeText(mom.organizationAddress || DEFAULT_ORG_ADDRESS);
   const y = doc.page.height - doc.page.margins.bottom - FOOTER_HEIGHT + 6;
+  const boxHeight = FOOTER_HEIGHT - 10;
+  const boxBottom = y + boxHeight;
+  const innerWidth = PAGE.contentWidth - 20;
+  const textX = x + 10;
 
   doc.save();
 
   doc
-    .roundedRect(x, y, PAGE.contentWidth, FOOTER_HEIGHT - 10, 7)
+    .roundedRect(x, y, PAGE.contentWidth, boxHeight, 7)
     .lineWidth(0.9)
     .fillAndStroke(COLORS.blockBg, COLORS.brandLine);
 
@@ -382,44 +387,62 @@ function drawPageFooter(doc, mom, authenticity = {}) {
     .font('Helvetica-Bold')
     .fontSize(8.3)
     .fillColor(COLORS.brandBlueDark)
-    .text('DIGITAL RECORD DECLARATION', x + 10, y + 7, {
-      width: PAGE.contentWidth - 20
+    .text('DIGITAL RECORD DECLARATION', textX, y + 7, {
+      width: innerWidth
     });
 
+  const statementY = y + 20;
   doc
     .font('Helvetica')
-    .fontSize(7.4)
+    .fontSize(8.2)
     .fillColor(COLORS.text)
-    .text(statement, x + 10, y + 20, {
-      width: PAGE.contentWidth - 20,
-      height: 18,
-      ellipsis: true
+    .text(statement, textX, statementY, {
+      width: innerWidth
     });
+
+  const statementHeight = doc.heightOfString(statement, { width: innerWidth });
+  const metaY = statementY + statementHeight + 3;
 
   if (line) {
     doc
       .font('Courier')
-      .fontSize(7.0)
+      .fontSize(7.7)
       .fillColor(COLORS.textMuted)
-      .text(line, x + 10, y + 39, {
-        width: PAGE.contentWidth - 20,
-        height: 10,
+      .text(line, textX, metaY, {
+        width: innerWidth,
         ellipsis: true
       });
   }
 
+  const metaHeight = line ? doc.heightOfString(line, { width: innerWidth }) : 0;
+  let dividerY = metaY + metaHeight + 4;
+
   doc
-    .moveTo(x, y + FOOTER_HEIGHT - 20)
-    .lineTo(x + PAGE.contentWidth, y + FOOTER_HEIGHT - 20)
+    .font('Helvetica')
+    .fontSize(8.4)
+    .fillColor(COLORS.textMuted);
+  const addressHeight = doc.heightOfString(address, { width: PAGE.contentWidth - 16, align: 'center' });
+  let addressY = dividerY + 3;
+  const maxAddressY = boxBottom - addressHeight - 4;
+  if (addressY > maxAddressY) {
+    addressY = maxAddressY;
+  }
+  if (dividerY > addressY - 2) {
+    dividerY = addressY - 2;
+  }
+
+  doc
+    .moveTo(x, dividerY)
+    .lineTo(x + PAGE.contentWidth, dividerY)
     .lineWidth(1.2)
     .strokeColor(COLORS.brandBlue)
     .stroke();
 
   doc
     .font('Helvetica')
-    .fontSize(8.1)
+    .fontSize(8.4)
     .fillColor(COLORS.textMuted)
-    .text(safeText(mom.organizationAddress || DEFAULT_ORG_ADDRESS), x + 8, y + FOOTER_HEIGHT - 16, {
+    .text(address, x + 8, addressY, {
       width: PAGE.contentWidth - 16,
       align: 'center'
     });
