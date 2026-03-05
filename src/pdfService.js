@@ -6,7 +6,7 @@ const PAGE = {
   margin: 40,
   contentWidth: 515
 };
-const FOOTER_HEIGHT = 112;
+const FOOTER_HEIGHT = 86;
 
 const COLORS = {
   brandBlue: '#0f4f98',
@@ -55,11 +55,15 @@ function normalizeProjectNumber(value) {
   return text.split('/')[0].trim() || text;
 }
 
-function ensurePageSpace(doc, requiredHeight = 80) {
+function ensurePageSpace(doc, requiredHeight = 80, authenticity = null) {
   const usableBottom = doc.page.height - doc.page.margins.bottom - FOOTER_HEIGHT;
   if (doc.y + requiredHeight > usableBottom) {
     doc.addPage();
-    drawHeaderBarOnly(doc);
+    if (authenticity) {
+      drawPageHeader(doc, authenticity);
+    } else {
+      drawHeaderBarOnly(doc);
+    }
   }
 }
 
@@ -196,8 +200,9 @@ function drawTopHeader(doc, mom, authenticity = {}) {
   doc.y = cardY + cardH + 10;
 }
 
-function drawSectionTitle(doc, title) {
-  ensurePageSpace(doc, 34);
+function drawSectionTitle(doc, title, minFollowingHeight = 0, authenticity = null) {
+  // Keep section title with at least one block of following content.
+  ensurePageSpace(doc, 34 + Math.max(0, minFollowingHeight), authenticity);
   const x = PAGE.margin;
   const y = doc.y;
   doc
@@ -214,7 +219,7 @@ function drawSectionTitle(doc, title) {
   doc.y = y + 30;
 }
 
-function drawTwoColumnRows(doc, rows) {
+function drawTwoColumnRows(doc, rows, authenticity = null) {
   const x = PAGE.margin;
   const width = PAGE.contentWidth;
   const halfWidth = width / 2;
@@ -234,7 +239,7 @@ function drawTwoColumnRows(doc, rows) {
     });
     const rowHeight = Math.max(30, Math.max(leftValueHeight, rightValueHeight) + 14);
 
-    ensurePageSpace(doc, rowHeight + 4);
+    ensurePageSpace(doc, rowHeight + 4, authenticity);
 
     const y = doc.y;
     doc
@@ -285,10 +290,10 @@ function drawTwoColumnRows(doc, rows) {
 }
 
 function drawStyledTable(doc, title, headers, widths, rows, authenticity = {}) {
-  drawSectionTitle(doc, title);
+  const headerHeight = 24;
+  drawSectionTitle(doc, title, headerHeight + 26, authenticity);
 
   const x = PAGE.margin;
-  const headerHeight = 24;
   let y = doc.y;
 
   const normalizedRows = rows && rows.length ? rows : [headers.map(() => '')];
@@ -314,7 +319,7 @@ function drawStyledTable(doc, title, headers, widths, rows, authenticity = {}) {
     });
   }
 
-  ensurePageSpace(doc, headerHeight + 26);
+  ensurePageSpace(doc, headerHeight + 26, authenticity);
   drawHeaderRow(y);
   y += headerHeight;
 
@@ -375,7 +380,7 @@ function drawPageFooter(doc, mom, authenticity = {}) {
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(8.8)
+    .fontSize(8.3)
     .fillColor(COLORS.brandBlueDark)
     .text('DIGITAL RECORD DECLARATION', x + 10, y + 7, {
       width: PAGE.contentWidth - 20
@@ -383,38 +388,38 @@ function drawPageFooter(doc, mom, authenticity = {}) {
 
   doc
     .font('Helvetica')
-    .fontSize(8.2)
+    .fontSize(7.4)
     .fillColor(COLORS.text)
     .text(statement, x + 10, y + 20, {
       width: PAGE.contentWidth - 20,
-      height: 34,
+      height: 18,
       ellipsis: true
     });
 
   if (line) {
     doc
       .font('Courier')
-      .fontSize(7.6)
+      .fontSize(7.0)
       .fillColor(COLORS.textMuted)
-      .text(line, x + 10, y + 58, {
+      .text(line, x + 10, y + 39, {
         width: PAGE.contentWidth - 20,
-        height: 14,
+        height: 10,
         ellipsis: true
       });
   }
 
   doc
-    .moveTo(x, y + FOOTER_HEIGHT - 26)
-    .lineTo(x + PAGE.contentWidth, y + FOOTER_HEIGHT - 26)
+    .moveTo(x, y + FOOTER_HEIGHT - 20)
+    .lineTo(x + PAGE.contentWidth, y + FOOTER_HEIGHT - 20)
     .lineWidth(1.2)
     .strokeColor(COLORS.brandBlue)
     .stroke();
 
   doc
     .font('Helvetica')
-    .fontSize(8.6)
+    .fontSize(8.1)
     .fillColor(COLORS.textMuted)
-    .text(safeText(mom.organizationAddress || DEFAULT_ORG_ADDRESS), x + 8, y + FOOTER_HEIGHT - 21, {
+    .text(safeText(mom.organizationAddress || DEFAULT_ORG_ADDRESS), x + 8, y + FOOTER_HEIGHT - 16, {
       width: PAGE.contentWidth - 16,
       align: 'center'
     });
@@ -430,19 +435,6 @@ function drawFooterOnAllPages(doc, mom, authenticity = {}) {
     drawPageFooter(doc, mom, authenticity);
   }
   doc.switchToPage(lastPageIndex);
-}
-
-function drawBottomAddress(doc, mom) {
-  const x = PAGE.margin;
-  const y = doc.page.height - doc.page.margins.bottom - 36;
-  doc
-    .font('Helvetica')
-    .fontSize(9.2)
-    .fillColor(COLORS.textMuted)
-    .text(safeText(mom.organizationAddress || DEFAULT_ORG_ADDRESS), x, y, {
-      width: PAGE.contentWidth,
-      align: 'center'
-    });
 }
 
 async function generateMomPdf(mom, outputDir, authenticity = {}) {
@@ -463,7 +455,7 @@ async function generateMomPdf(mom, outputDir, authenticity = {}) {
 
     drawTopHeader(doc, mom, authenticity);
 
-    drawSectionTitle(doc, '1. GENERAL INFORMATION');
+    drawSectionTitle(doc, '1. GENERAL INFORMATION', 40, authenticity);
     drawTwoColumnRows(doc, [
       { leftLabel: 'Meeting Title', leftValue: mom.meetingTitle, rightLabel: 'Project Name', rightValue: mom.projectName },
       {
@@ -480,9 +472,9 @@ async function generateMomPdf(mom, outputDir, authenticity = {}) {
       },
       { leftLabel: 'Meeting Date', leftValue: mom.meetingDate, rightLabel: 'Meeting Time', rightValue: mom.meetingTime },
       { leftLabel: 'Entry Time', leftValue: mom.entryTime, rightLabel: 'Exit Time', rightValue: mom.exitTime }
-    ]);
+    ], authenticity);
 
-    drawSectionTitle(doc, '2. DETAILS OF MEETING');
+    drawSectionTitle(doc, '2. DETAILS OF MEETING', 40, authenticity);
     drawTwoColumnRows(doc, [
       {
         leftLabel: 'Meeting Location',
@@ -508,7 +500,7 @@ async function generateMomPdf(mom, outputDir, authenticity = {}) {
         rightLabel: 'Zoho Synced On',
         rightValue: mom.projectUpdated || '-'
       }
-    ]);
+    ], authenticity);
 
     drawStyledTable(
       doc,
