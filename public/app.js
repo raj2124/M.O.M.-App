@@ -1377,7 +1377,7 @@ function buildOutlookComposeUrlDesktop({ to = '', cc = '', subject = '', body = 
 }
 
 function buildOutlookComposeUrlMobile({ to = '', cc = '', subject = '', body = '' }) {
-  const queryParts = ['path=/mail/action/compose'];
+  const queryParts = ['rru=compose'];
   const trimmedTo = String(to || '').trim();
   const trimmedCc = String(cc || '').trim();
   if (trimmedTo) {
@@ -1388,7 +1388,7 @@ function buildOutlookComposeUrlMobile({ to = '', cc = '', subject = '', body = '
   }
   queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
   queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
-  return `https://outlook.office.com/owa/?${queryParts.join('&')}`;
+  return `https://outlook.office.com/mail/?${queryParts.join('&')}`;
 }
 
 function isMobileDevice() {
@@ -1397,13 +1397,46 @@ function isMobileDevice() {
   return /iPhone|iPad|iPod|Android|Mobile|Opera Mini|IEMobile/i.test(ua) || touchPoints > 1;
 }
 
-function getPreferredOutlookComposeUrl(draft = {}) {
+function getOutlookComposeUrlCandidates(draft = {}) {
   const mobileUrl = String(draft.outlookComposeMobileUrl || '').trim();
   const desktopUrl = String(draft.outlookComposeUrl || '').trim();
-  if (isMobileDevice() && mobileUrl) {
-    return mobileUrl;
+  const ordered = isMobileDevice()
+    ? [mobileUrl, desktopUrl]
+    : [desktopUrl, mobileUrl];
+  return ordered.filter((url, index, array) => Boolean(url) && array.indexOf(url) === index);
+}
+
+function openOutlookDraftWithFallbackUrls(candidates, preopenedWindow = null) {
+  const urls = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+  if (!urls.length) {
+    return false;
   }
-  return desktopUrl || mobileUrl;
+
+  const primaryUrl = urls[0];
+  const secondaryUrl = urls[1] || '';
+  const targetWindow = preopenedWindow && !preopenedWindow.closed
+    ? preopenedWindow
+    : window.open(primaryUrl, '_blank', 'noopener');
+
+  if (!targetWindow) {
+    return false;
+  }
+
+  if (targetWindow !== preopenedWindow) {
+    targetWindow.location.href = primaryUrl;
+  } else {
+    targetWindow.location.href = primaryUrl;
+  }
+
+  if (secondaryUrl && secondaryUrl !== primaryUrl) {
+    window.setTimeout(() => {
+      if (targetWindow && !targetWindow.closed) {
+        targetWindow.location.href = secondaryUrl;
+      }
+    }, 900);
+  }
+
+  return true;
 }
 
 function buildOutlookDraftUrlForRecord(record, options, pdfAbsoluteUrl) {
@@ -1977,24 +2010,16 @@ confirmRecordExportBtn.addEventListener('click', () => {
   }
 
   const needsPdfWindow = Boolean(options.printPdf || (options.generatePdf && !options.sendEmail));
-  const mobileDevice = isMobileDevice();
   const preopenedPdfWindow = needsPdfWindow ? window.open('about:blank', '_blank') : null;
   const preopenedOutlookWindow = options.sendEmail ? window.open('about:blank', '_blank') : null;
 
   try {
     if (options.sendEmail) {
       const draftTargets = buildOutlookDraftUrlForRecord(record, options, pdfAbsoluteUrl);
-      const outlookUrl = getPreferredOutlookComposeUrl(draftTargets);
-      if (preopenedOutlookWindow && !preopenedOutlookWindow.closed) {
-        preopenedOutlookWindow.location.href = outlookUrl;
-      } else {
-        const win = window.open(outlookUrl, '_blank', 'noopener');
-        if (win) {
-          // no-op
-        } else {
-          window.location.href = outlookUrl;
-          showToast('Opening Outlook in current tab (popup was blocked).');
-        }
+      const candidates = getOutlookComposeUrlCandidates(draftTargets);
+      const opened = openOutlookDraftWithFallbackUrls(candidates, preopenedOutlookWindow);
+      if (!opened) {
+        showToast('Popup blocked for Outlook draft. Please allow popups and retry.', 'error');
       }
       showToast('Outlook draft opened with PDF link in email body.');
     }
@@ -2051,7 +2076,6 @@ confirmSubmitBtn.addEventListener('click', async () => {
   confirmSubmitBtn.textContent = 'Submitting...';
 
   const needsPdfWindow = Boolean(options.printPdf || (options.generatePdf && !options.sendEmail));
-  const mobileDevice = isMobileDevice();
   const preopenedPdfWindow = needsPdfWindow ? window.open('about:blank', '_blank') : null;
   const preopenedOutlookWindow = options.sendEmail ? window.open('about:blank', '_blank') : null;
 
@@ -2085,16 +2109,13 @@ confirmSubmitBtn.addEventListener('click', async () => {
 
     if (options.sendEmail) {
       const emailDraft = result.emailDraft || {};
-      const outlookUrl = getPreferredOutlookComposeUrl(emailDraft);
-      if (!outlookUrl) {
+      const candidates = getOutlookComposeUrlCandidates(emailDraft);
+      if (!candidates.length) {
         showToast('Outlook draft URL unavailable from server.', 'error');
-      } else if (preopenedOutlookWindow && !preopenedOutlookWindow.closed) {
-        preopenedOutlookWindow.location.href = outlookUrl;
       } else {
-        const outlookWindow = window.open(outlookUrl, '_blank', 'noopener');
-        if (!outlookWindow) {
-          window.location.href = outlookUrl;
-          showToast('Opening Outlook in current tab (popup was blocked).');
+        const opened = openOutlookDraftWithFallbackUrls(candidates, preopenedOutlookWindow);
+        if (!opened) {
+          showToast('Popup blocked for Outlook draft. Please allow popups and retry.', 'error');
         }
       }
       showToast('Outlook draft opened with generated PDF link in email body.');

@@ -153,7 +153,7 @@ function buildOutlookComposeUrlDesktop({ to = '', cc = '', subject = '', body = 
 }
 
 function buildOutlookComposeUrlMobile({ to = '', cc = '', subject = '', body = '' }) {
-  const queryParts = ['path=/mail/action/compose'];
+  const queryParts = ['rru=compose'];
   const trimmedTo = String(to || '').trim();
   const trimmedCc = String(cc || '').trim();
   if (trimmedTo) {
@@ -164,7 +164,7 @@ function buildOutlookComposeUrlMobile({ to = '', cc = '', subject = '', body = '
   }
   queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
   queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
-  return `https://outlook.office.com/owa/?${queryParts.join('&')}`;
+  return `https://outlook.office.com/mail/?${queryParts.join('&')}`;
 }
 
 function buildOutlookDraft({ mom, options, pdfUrl }) {
