@@ -40,6 +40,10 @@ const zohoMetaStatusWrap = document.getElementById('zohoMetaStatusWrap');
 const projectNameInput = document.getElementById('projectName');
 const projectNoInput = document.getElementById('projectNoWorkOrderNo');
 const clientNameInput = document.getElementById('clientName');
+const meetingDateInput = document.getElementById('meetingDate');
+const meetingTimeInput = document.getElementById('meetingTime');
+const entryTimeInput = document.getElementById('entryTime');
+const exitTimeInput = document.getElementById('exitTime');
 
 const kpiTotalMom = document.getElementById('kpiTotalMom');
 const kpiZohoMode = document.getElementById('kpiZohoMode');
@@ -133,6 +137,212 @@ function refreshDashboardStats() {
 
 function pad2(value) {
   return String(value).padStart(2, '0');
+}
+
+function normalizeDateInputValue(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const slashMatch = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(raw);
+  if (slashMatch) {
+    const day = pad2(slashMatch[1]);
+    const month = pad2(slashMatch[2]);
+    const year = slashMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+  return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}`;
+}
+
+function normalizeTimeInputValue(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const twentyFourHour = /^(\d{1,2}):(\d{2})$/.exec(raw);
+  if (twentyFourHour) {
+    const hours = Number.parseInt(twentyFourHour[1], 10);
+    const minutes = Number.parseInt(twentyFourHour[2], 10);
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+      return `${pad2(hours)}:${pad2(minutes)}`;
+    }
+  }
+
+  const twelveHour = /^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/.exec(raw);
+  if (!twelveHour) {
+    return '';
+  }
+
+  let hours = Number.parseInt(twelveHour[1], 10);
+  const minutes = Number.parseInt(twelveHour[2], 10);
+  const meridian = twelveHour[3].toUpperCase();
+
+  if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
+    return '';
+  }
+
+  if (meridian === 'AM' && hours === 12) {
+    hours = 0;
+  } else if (meridian === 'PM' && hours !== 12) {
+    hours += 12;
+  }
+
+  return `${pad2(hours)}:${pad2(minutes)}`;
+}
+
+function formatMeetingDateDisplay(rawDate) {
+  const normalized = normalizeDateInputValue(rawDate);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+  if (!match) {
+    return rawDate || '-';
+  }
+
+  const parsed = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return parsed.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+function normalizeDateTimeFields() {
+  const normalizedDate = normalizeDateInputValue(meetingDateInput.value);
+  if (normalizedDate) {
+    meetingDateInput.value = normalizedDate;
+  }
+
+  [meetingTimeInput, entryTimeInput, exitTimeInput].forEach((input) => {
+    const normalized = normalizeTimeInputValue(input.value);
+    if (normalized) {
+      input.value = normalized;
+    }
+  });
+}
+
+function getDateTimeValidationError() {
+  const dateRaw = String(meetingDateInput.value || '').trim();
+  const dateNormalized = normalizeDateInputValue(dateRaw);
+  if (dateRaw && !dateNormalized) {
+    return 'Please enter Meeting Date in a valid format (YYYY-MM-DD or DD/MM/YYYY).';
+  }
+
+  const timeFields = [
+    { label: 'Meeting Time', input: meetingTimeInput },
+    { label: 'Entry Time', input: entryTimeInput },
+    { label: 'Exit Time', input: exitTimeInput }
+  ];
+
+  for (const field of timeFields) {
+    const raw = String(field.input?.value || '').trim();
+    if (!raw) {
+      continue;
+    }
+    if (!normalizeTimeInputValue(raw)) {
+      return `Please enter ${field.label} as HH:MM or hh:mm AM/PM.`;
+    }
+  }
+
+  return '';
+}
+
+function attachNativePickerBehavior(input) {
+  if (!input) {
+    return;
+  }
+  const openPicker = () => {
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker();
+      } catch (_error) {
+        // Browser denied showPicker without user gesture.
+      }
+    }
+  };
+  input.addEventListener('focus', openPicker);
+  input.addEventListener('click', openPicker);
+}
+
+function initDateTimeInputs() {
+  const hasFlatpickr = typeof window.flatpickr === 'function';
+  const dateInputs = [meetingDateInput, meetingTimeInput, entryTimeInput, exitTimeInput];
+  meetingDateInput.placeholder = 'YYYY-MM-DD';
+  [meetingTimeInput, entryTimeInput, exitTimeInput].forEach((input) => {
+    input.placeholder = 'HH:MM';
+  });
+
+  if (!hasFlatpickr) {
+    meetingDateInput.type = 'date';
+    [meetingTimeInput, entryTimeInput, exitTimeInput].forEach((input) => {
+      input.type = 'time';
+      input.step = '60';
+    });
+    dateInputs.forEach(attachNativePickerBehavior);
+  } else {
+    window.flatpickr(meetingDateInput, {
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'd/m/Y',
+      allowInput: true,
+      clickOpens: true,
+      disableMobile: true,
+      onClose: () => {
+        const normalized = normalizeDateInputValue(meetingDateInput.value);
+        if (normalized) {
+          meetingDateInput.value = normalized;
+        }
+      }
+    });
+
+    const timeOptions = {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: 'H:i',
+      altInput: true,
+      altFormat: 'h:i K',
+      time_24hr: false,
+      allowInput: true,
+      clickOpens: true,
+      disableMobile: true,
+      onClose: (_selectedDates, _dateStr, instance) => {
+        const normalized = normalizeTimeInputValue(instance.input.value);
+        if (normalized) {
+          instance.input.value = normalized;
+        }
+      }
+    };
+
+    [meetingTimeInput, entryTimeInput, exitTimeInput].forEach((input) => {
+      window.flatpickr(input, timeOptions);
+    });
+  }
+
+  meetingDateInput.addEventListener('blur', () => {
+    const normalized = normalizeDateInputValue(meetingDateInput.value);
+    if (normalized) {
+      meetingDateInput.value = normalized;
+    }
+  });
+
+  [meetingTimeInput, entryTimeInput, exitTimeInput].forEach((input) => {
+    input.addEventListener('blur', () => {
+      const normalized = normalizeTimeInputValue(input.value);
+      if (normalized) {
+        input.value = normalized;
+      }
+    });
+  });
 }
 
 function formatAuthLineTimestamp(date) {
@@ -678,6 +888,12 @@ function clearProjectFields() {
 
 function resetFormForNewSheet() {
   momForm.reset();
+  [meetingDateInput, meetingTimeInput, entryTimeInput, exitTimeInput].forEach((input) => {
+    if (input?._flatpickr) {
+      input._flatpickr.clear();
+    }
+    input.value = '';
+  });
   clearProjectFields();
   currentProjectUsers = [];
   isProjectUsersLoading = false;
@@ -1138,14 +1354,35 @@ function getRecordDaysLeft(record) {
   return String(days);
 }
 
+function encodeOutlookQueryComponent(value) {
+  return encodeURIComponent(String(value || '')).replace(/[!'()*]/g, (char) => {
+    return `%${char.charCodeAt(0).toString(16).toUpperCase()}`;
+  });
+}
+
+function buildOutlookComposeUrl({ to = '', cc = '', subject = '', body = '' }) {
+  const queryParts = [];
+  const trimmedTo = String(to || '').trim();
+  const trimmedCc = String(cc || '').trim();
+  if (trimmedTo) {
+    queryParts.push(`to=${encodeOutlookQueryComponent(trimmedTo)}`);
+  }
+  if (trimmedCc) {
+    queryParts.push(`cc=${encodeOutlookQueryComponent(trimmedCc)}`);
+  }
+  queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
+  queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
+  return `https://outlook.office.com/mail/deeplink/compose?${queryParts.join('&')}`;
+}
+
 function buildOutlookDraftUrlForRecord(record, options, pdfAbsoluteUrl) {
   const to = String(options.emailTo || '').trim();
   const cc = String(options.emailCc || '').trim();
   const projectRef = getProjectRefForSubject(record.projectNoWorkOrderNo, record.projectName);
   const subject =
     String(options.emailSubject || '').trim() ||
-    `M.O.M-${projectRef}-${formatMeetingDateForSubject(record.meetingDate)}`;
-  const body = buildProfessionalBody({
+    buildMomEmailSubject(projectRef, record.meetingDate);
+  const defaultBody = buildProfessionalBody({
     projectRef,
     meetingTitle: record.meetingTitle,
     meetingDate: formatMeetingDateForBody(record.meetingDate),
@@ -1153,18 +1390,9 @@ function buildOutlookDraftUrlForRecord(record, options, pdfAbsoluteUrl) {
     meetingLocation: record.meetingLocation || '-',
     pdfUrl: pdfAbsoluteUrl
   });
+  const body = String(options.emailBody || '').trim() || defaultBody;
 
-  const queryParts = [];
-  if (to) {
-    queryParts.push(`to=${encodeURIComponent(to)}`);
-  }
-  if (cc) {
-    queryParts.push(`cc=${encodeURIComponent(cc)}`);
-  }
-  queryParts.push(`subject=${encodeURIComponent(subject)}`);
-  queryParts.push(`body=${encodeURIComponent(body)}`);
-
-  return `https://outlook.office.com/mail/deeplink/compose?${queryParts.join('&')}`;
+  return buildOutlookComposeUrl({ to, cc, subject, body });
 }
 
 function getRecordOutputBadges(record) {
@@ -1301,6 +1529,7 @@ function collectAttendeeRows() {
 }
 
 function collectMomPayload() {
+  normalizeDateTimeFields();
   return {
     meetingTitle: document.getElementById('meetingTitle').value,
     projectName: projectNameInput.value,
@@ -1309,10 +1538,10 @@ function collectMomPayload() {
     projectStatus: activeProjectSource === 'zoho' ? String(zohoMetaStatus?.textContent || '').trim() : '',
     projectUpdated: activeProjectSource === 'zoho' ? String(zohoMetaUpdated?.textContent || '').trim() : '',
     clientName: clientNameInput.value,
-    meetingDate: document.getElementById('meetingDate').value,
-    meetingTime: document.getElementById('meetingTime').value,
-    entryTime: document.getElementById('entryTime').value,
-    exitTime: document.getElementById('exitTime').value,
+    meetingDate: normalizeDateInputValue(meetingDateInput.value),
+    meetingTime: normalizeTimeInputValue(meetingTimeInput.value),
+    entryTime: normalizeTimeInputValue(entryTimeInput.value),
+    exitTime: normalizeTimeInputValue(exitTimeInput.value),
     meetingLocation: document.getElementById('meetingLocation').value,
     meetingCalledBy: document.getElementById('meetingCalledBy').value,
     meetingType: getMeetingTypes(),
@@ -1350,7 +1579,7 @@ function getProjectRefForSubject(projectNoWorkOrderNo, projectName = '') {
 }
 
 function formatMeetingDateForSubject(rawDate) {
-  const value = String(rawDate || '').trim();
+  const value = normalizeDateInputValue(rawDate);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (match) {
     return `${match[1]}/${match[2]}/${match[3]}`;
@@ -1359,16 +1588,11 @@ function formatMeetingDateForSubject(rawDate) {
 }
 
 function formatMeetingDateForBody(rawDate) {
-  const value = String(rawDate || '').trim();
-  const parsed = new Date(value);
-  if (!value || Number.isNaN(parsed.getTime())) {
-    return value || '-';
-  }
-  return parsed.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  return formatMeetingDateDisplay(rawDate);
+}
+
+function buildMomEmailSubject(projectRef, meetingDate) {
+  return `MOM - Project ${projectRef} - ${formatMeetingDateForSubject(meetingDate)}`;
 }
 
 function buildProfessionalBody({
@@ -1392,7 +1616,9 @@ function buildProfessionalBody({
     '',
     'The detailed Minutes of Meeting are attached in the PDF for your reference.',
     'For convenience, you may also access the document using the link below:',
-    pdfUrl,
+    `${pdfUrl}`,
+    '',
+    `Open PDF: <${pdfUrl}>`,
     '',
     'Please review the document and feel free to let us know if any clarifications or additions are required.',
     'Best regards,',
@@ -1414,7 +1640,7 @@ function buildDeliveryBodyDraft(mom) {
 
 function prefillDeliveryEmailFields(mom) {
   const projectRef = getProjectRefForSubject(mom.projectNoWorkOrderNo, mom.projectName);
-  const subject = `M.O.M-${projectRef}-${formatMeetingDateForSubject(mom.meetingDate)}`;
+  const subject = buildMomEmailSubject(projectRef, mom.meetingDate);
   document.getElementById('emailSubject').value = subject;
   document.getElementById('emailBody').value = buildDeliveryBodyDraft(mom);
 }
@@ -1448,7 +1674,7 @@ function openRecordExportModal(record) {
   recordEmailTo.value = '';
   recordEmailCc.value = '';
   const projectRef = getProjectRefForSubject(record.projectNoWorkOrderNo, record.projectName);
-  recordEmailSubject.value = `M.O.M-${projectRef}-${formatMeetingDateForSubject(record.meetingDate)}`;
+  recordEmailSubject.value = buildMomEmailSubject(projectRef, record.meetingDate);
   recordEmailBody.value = buildProfessionalBody({
     projectRef,
     meetingTitle: record.meetingTitle,
@@ -1655,6 +1881,12 @@ addAttendeeRowBtn.addEventListener('click', () => addAttendeeRow());
 momForm.addEventListener('submit', (event) => {
   event.preventDefault();
 
+  const dateTimeError = getDateTimeValidationError();
+  if (dateTimeError) {
+    showToast(dateTimeError, 'error');
+    return;
+  }
+
   if (activeProjectSource === 'zoho' && !zohoProjectSelect.value) {
     showToast('Please select a Zoho project from the dropdown.', 'error');
     return;
@@ -1763,6 +1995,12 @@ confirmRecordExportBtn.addEventListener('click', () => {
 });
 
 confirmSubmitBtn.addEventListener('click', async () => {
+  const dateTimeError = getDateTimeValidationError();
+  if (dateTimeError) {
+    showToast(dateTimeError, 'error');
+    return;
+  }
+
   const mom = collectMomPayload();
   const options = collectSubmitOptions();
 
@@ -1853,6 +2091,7 @@ confirmSubmitBtn.addEventListener('click', async () => {
   }
 });
 
+initDateTimeInputs();
 setProjectSource('zoho');
 resetRows();
 renderAuthenticityLine();

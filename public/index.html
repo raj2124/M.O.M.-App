@@ -9,6 +9,12 @@
     <link rel="shortcut icon" href="/favicon-32x32.png?v=1" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=1" />
     <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
   </head>
   <body>
     <main class="app-shell">
@@ -192,19 +198,19 @@
               </label>
               <label>
                 Meeting Date
-                <input id="meetingDate" name="meetingDate" type="date" required />
+                <input id="meetingDate" name="meetingDate" type="text" inputmode="numeric" autocomplete="off" required />
               </label>
               <label>
                 Meeting Time
-                <input id="meetingTime" name="meetingTime" type="time" />
+                <input id="meetingTime" name="meetingTime" type="text" inputmode="numeric" autocomplete="off" />
               </label>
               <label>
                 Entry Time
-                <input id="entryTime" name="entryTime" type="time" />
+                <input id="entryTime" name="entryTime" type="text" inputmode="numeric" autocomplete="off" />
               </label>
               <label>
                 Exit Time
-                <input id="exitTime" name="exitTime" type="time" />
+                <input id="exitTime" name="exitTime" type="text" inputmode="numeric" autocomplete="off" />
               </label>
             </div>
           </section>
@@ -471,7 +477,7 @@
               name="email_to"
               type="email"
               inputmode="email"
-              autocomplete="email"
+              autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
               placeholder="client@example.com (or leave blank)"
@@ -538,7 +544,7 @@
               name="record_email_to"
               type="email"
               inputmode="email"
-              autocomplete="email"
+              autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
               placeholder="client@example.com (or leave blank)"
@@ -589,6 +595,7 @@
     </dialog>
 
     <div id="toast" class="toast"></div>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="/app.js"></script>
   </body>
 </html>

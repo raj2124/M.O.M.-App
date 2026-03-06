@@ -1014,6 +1014,28 @@ textarea {
   color: #12233b;
 }
 
+.flatpickr-calendar {
+  border: 1px solid #b7cee3;
+  box-shadow: 0 16px 32px rgba(8, 37, 74, 0.18);
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover,
+.flatpickr-time input:hover,
+.flatpickr-time .flatpickr-am-pm:hover {
+  background: #1f63a5;
+  border-color: #1f63a5;
+}
+
+.flatpickr-time input:focus,
+.flatpickr-time .flatpickr-am-pm:focus {
+  background: #e3eef9;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -1038,6 +1060,7 @@ textarea {
 }
 
 #editorView input:not([type='checkbox']):not([type='radio']),
+#editorView .flatpickr-input,
 #editorView select,
 #editorView textarea {
   border-color: #c2d6e8;
@@ -1049,6 +1072,7 @@ textarea {
 }
 
 #editorView input:not([type='checkbox']):not([type='radio']):hover,
+#editorView .flatpickr-input:hover,
 #editorView select:hover,
 #editorView textarea:hover {
   border-color: #9fc3df;
@@ -1059,10 +1083,16 @@ textarea {
   color: #35506a;
 }
 
+#editorView .flatpickr-input[readonly] {
+  cursor: pointer;
+}
+
 /* Keep side-by-side form controls visually aligned in all sections */
 #editorView .grid-2 > label > input:not([type='checkbox']):not([type='radio']),
+#editorView .grid-2 > label > .flatpickr-input,
 #editorView .grid-2 > label > select,
 #editorView .grid-3 > label > input:not([type='checkbox']):not([type='radio']),
+#editorView .grid-3 > label > .flatpickr-input,
 #editorView .grid-3 > label > select {
   min-height: 44px;
   height: 44px;
