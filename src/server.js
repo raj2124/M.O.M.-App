@@ -196,6 +196,17 @@ function buildEmailDraftPayload({ mom, options, pdfUrl, pdfFileName = '' }) {
     'Best regards,',
     'ETPL_AI MoM System'
   ].join('\r\n');
+  // Keep deeplink body concise to improve mobile browser reliability.
+  const composeBodyText = [
+    'Dear Sir / Madam,',
+    `Please find the Minutes of Meeting (MoM) for project ${projectRef}.`,
+    `Meeting Date: ${meetingDate}`,
+    `Meeting Time: ${meetingTime}`,
+    `Meeting Location: ${meetingLocation}`,
+    `PDF Link: ${pdfAbsoluteUrl}`,
+    'Best regards,',
+    'ETPL_AI MoM System'
+  ].join('\r\n');
   const bodyHtml = buildGraphBodyHtml({
     bodyText,
     pdfUrl: pdfAbsoluteUrl
@@ -206,6 +217,7 @@ function buildEmailDraftPayload({ mom, options, pdfUrl, pdfFileName = '' }) {
     cc,
     subject,
     bodyText,
+    composeBodyText,
     bodyHtml,
     pdfAbsoluteUrl,
     pdfFileName: String(pdfFileName || '').trim(),
@@ -218,7 +230,7 @@ function buildOutlookDraftFromPayload(payload, warning = '') {
   const to = String(payload.to || '').trim();
   const cc = String(payload.cc || '').trim();
   const subject = String(payload.subject || '').trim();
-  const body = String(payload.bodyText || '').trim();
+  const body = String(payload.composeBodyText || payload.bodyText || '').trim();
   return {
     mode: 'outlook-draft',
     to,
@@ -282,9 +294,12 @@ async function buildEmailDraft({ mom, options, pdfUrl, pdfFileName = '' }) {
       })
     };
   } catch (error) {
+    // Log full error server-side, but keep user-facing fallback message concise.
+    // eslint-disable-next-line no-console
+    console.error(`Graph draft creation failed: ${error.message}`);
     return buildOutlookDraftFromPayload(
       payload,
-      `${error.message || 'Graph draft creation failed.'} Switched to Outlook deeplink fallback.`
+      'Microsoft Graph draft is unavailable right now. Switched to Outlook deeplink fallback.'
     );
   }
 }

@@ -1449,6 +1449,7 @@ function openEmailDraftFromResponse(emailDraft = {}, preopenedWindow = null) {
   if (isMobile) {
     const mobileTarget = composeUrl || graphUrl || '';
     if (mobileTarget) {
+      // iOS/Android browsers handle same-tab navigation more reliably than popups for compose links.
       window.location.href = mobileTarget;
       return true;
     }
@@ -2031,7 +2032,8 @@ confirmRecordExportBtn.addEventListener('click', async () => {
 
   const needsPdfWindow = Boolean(options.printPdf || (options.generatePdf && !options.sendEmail));
   const preopenedPdfWindow = needsPdfWindow ? window.open('about:blank', '_blank') : null;
-  const preopenedOutlookWindow = options.sendEmail ? window.open('about:blank', '_blank') : null;
+  const preopenedOutlookWindow =
+    options.sendEmail && !isMobileDevice() ? window.open('about:blank', '_blank') : null;
 
   try {
     if (options.sendEmail) {
@@ -2123,7 +2125,8 @@ confirmSubmitBtn.addEventListener('click', async () => {
 
   const needsPdfWindow = Boolean(options.printPdf || (options.generatePdf && !options.sendEmail));
   const preopenedPdfWindow = needsPdfWindow ? window.open('about:blank', '_blank') : null;
-  const preopenedOutlookWindow = options.sendEmail ? window.open('about:blank', '_blank') : null;
+  const preopenedOutlookWindow =
+    options.sendEmail && !isMobileDevice() ? window.open('about:blank', '_blank') : null;
 
   try {
     const response = await fetch('/api/mom/submit', {
