@@ -2057,7 +2057,11 @@ confirmRecordExportBtn.addEventListener('click', async () => {
       }
       const draftMode = String(emailDraft.mode || '').trim();
       if (draftMode === 'graph-draft') {
-        showToast('Microsoft Outlook draft created and opened.');
+        if (isMobileDevice()) {
+          showToast('Server draft created. Mobile compose opened. If needed, full draft is in Outlook Drafts.');
+        } else {
+          showToast('Microsoft Outlook draft created and opened.');
+        }
       } else {
         showToast('Outlook draft opened with PDF link in email body.');
       }
@@ -2160,7 +2164,11 @@ confirmSubmitBtn.addEventListener('click', async () => {
         }
       }
       if (String(emailDraft.mode || '').trim().toLowerCase() === 'graph-draft') {
-        showToast('Microsoft Outlook draft created and opened.');
+        if (isMobileDevice()) {
+          showToast('Server draft created. Mobile compose opened. If needed, full draft is in Outlook Drafts.');
+        } else {
+          showToast('Microsoft Outlook draft created and opened.');
+        }
       } else {
         showToast('Outlook draft opened with generated PDF link in email body.');
       }
