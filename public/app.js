@@ -29,6 +29,7 @@ const mobileMailAssistMeta = document.getElementById('mobileMailAssistMeta');
 const mobileMailAssistBody = document.getElementById('mobileMailAssistBody');
 const mobileMailAssistCopyBtn = document.getElementById('mobileMailAssistCopyBtn');
 const mobileMailAssistOpenBtn = document.getElementById('mobileMailAssistOpenBtn');
+const mobileMailAssistBrowserBtn = document.getElementById('mobileMailAssistBrowserBtn');
 const mobileMailAssistCloseBtn = document.getElementById('mobileMailAssistCloseBtn');
 
 const dashboardSearchInput = document.getElementById('dashboardSearchInput');
@@ -112,6 +113,7 @@ let momGeneratedBy = 'ETPL_AI M.O.M System';
 let recordsSearchTimer;
 let recordsCache = [];
 let activeRecordExport = null;
+let pendingMobileAppComposeUrl = '';
 let pendingMobileComposeUrl = '';
 let pendingMobileMailtoUrl = '';
 let pendingMobileBodyText = '';
@@ -1392,6 +1394,21 @@ function buildOutlookComposeUrlMobile({ to = '', cc = '', subject = '', body = '
   return buildOutlookComposeUrlDesktop({ to, cc, subject, body });
 }
 
+function buildOutlookAppComposeUrl({ to = '', cc = '', subject = '', body = '' }) {
+  const queryParts = [];
+  const trimmedTo = String(to || '').trim();
+  const trimmedCc = String(cc || '').trim();
+  if (trimmedTo) {
+    queryParts.push(`to=${encodeOutlookQueryComponent(trimmedTo)}`);
+  }
+  if (trimmedCc) {
+    queryParts.push(`cc=${encodeOutlookQueryComponent(trimmedCc)}`);
+  }
+  queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
+  queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
+  return `ms-outlook://compose?${queryParts.join('&')}`;
+}
+
 function isMobileDevice() {
   const ua = String(navigator.userAgent || '');
   const touchPoints = Number(navigator.maxTouchPoints || 0);
@@ -1463,27 +1480,39 @@ function buildCompactMobileBody(emailDraft = {}) {
 
 function chooseMobileComposeTargets(emailDraft = {}) {
   const MAX_MOBILE_URL_LENGTH = 1800;
-  const candidates = getOutlookComposeUrlCandidates(emailDraft);
-  const composeUrl = String(candidates[0] || '').trim();
-  const composeFits = composeUrl && composeUrl.length <= MAX_MOBILE_URL_LENGTH;
+  const to = String(emailDraft.to || '').trim();
+  const cc = String(emailDraft.cc || '').trim();
+  const subject = String(emailDraft.subject || '').trim();
+  const fullBody = String(emailDraft.body || '').trim();
+  const compactBody = buildCompactMobileBody(emailDraft);
+
+  const browserCandidates = getOutlookComposeUrlCandidates(emailDraft);
+  const browserComposeUrl = String(browserCandidates[0] || '').trim();
+  const appComposeUrl =
+    String(emailDraft.outlookAppComposeUrl || '').trim() ||
+    buildOutlookAppComposeUrl({ to, cc, subject, body: fullBody });
+  const composeFits = browserComposeUrl && browserComposeUrl.length <= MAX_MOBILE_URL_LENGTH;
 
   if (composeFits) {
     return {
-      composeUrl,
+      appComposeUrl,
+      composeUrl: browserComposeUrl,
       mailtoUrl: '',
       reason: ''
     };
   }
 
   const compactMailtoUrl = buildMailtoFallbackUrl({
-    to: String(emailDraft.to || '').trim(),
-    cc: String(emailDraft.cc || '').trim(),
-    subject: String(emailDraft.subject || '').trim(),
-    body: buildCompactMobileBody(emailDraft)
+    to,
+    cc,
+    subject,
+    body: compactBody
   });
+  const compactAppComposeUrl = buildOutlookAppComposeUrl({ to, cc, subject, body: compactBody });
 
   if (compactMailtoUrl && compactMailtoUrl.length <= MAX_MOBILE_URL_LENGTH) {
     return {
+      appComposeUrl: compactAppComposeUrl,
       composeUrl: '',
       mailtoUrl: compactMailtoUrl,
       reason: 'Long draft content on mobile. Using compact compose fallback.'
@@ -1491,13 +1520,20 @@ function chooseMobileComposeTargets(emailDraft = {}) {
   }
 
   const minimalMailtoUrl = buildMailtoFallbackUrl({
-    to: String(emailDraft.to || '').trim(),
-    cc: String(emailDraft.cc || '').trim(),
-    subject: String(emailDraft.subject || '').trim(),
+    to,
+    cc,
+    subject,
+    body: ''
+  });
+  const minimalAppComposeUrl = buildOutlookAppComposeUrl({
+    to,
+    cc,
+    subject,
     body: ''
   });
 
   return {
+    appComposeUrl: minimalAppComposeUrl,
     composeUrl: '',
     mailtoUrl: minimalMailtoUrl,
     reason: 'Long draft content on mobile. Opening minimal compose; paste body manually.'
@@ -1506,7 +1542,8 @@ function chooseMobileComposeTargets(emailDraft = {}) {
 
 function openMobileMailAssist(emailDraft = {}) {
   const fullBody = String(emailDraft.body || '').trim();
-  const { composeUrl, mailtoUrl, reason } = chooseMobileComposeTargets(emailDraft);
+  const { appComposeUrl, composeUrl, mailtoUrl, reason } = chooseMobileComposeTargets(emailDraft);
+  pendingMobileAppComposeUrl = appComposeUrl;
   pendingMobileComposeUrl = composeUrl;
   pendingMobileMailtoUrl = mailtoUrl;
   pendingMobileBodyText = fullBody || buildCompactMobileBody(emailDraft);
@@ -1519,7 +1556,7 @@ function openMobileMailAssist(emailDraft = {}) {
     ].filter(Boolean);
     mobileMailAssistMeta.textContent =
       noteParts.join(' ') ||
-      'Tap Open Compose to continue in your mail app/browser. If body is missing, copy it from below.';
+      'Tap Open Outlook App to continue. If app compose does not open, use Open Browser Compose.';
   }
 
   if (mobileMailAssistBody) {
@@ -1527,7 +1564,11 @@ function openMobileMailAssist(emailDraft = {}) {
   }
 
   if (mobileMailAssistOpenBtn) {
-    mobileMailAssistOpenBtn.textContent = pendingMobileComposeUrl ? 'Open Compose' : 'Open Mail App';
+    mobileMailAssistOpenBtn.textContent = pendingMobileAppComposeUrl ? 'Open Outlook App' : 'Open Mail App';
+  }
+
+  if (mobileMailAssistBrowserBtn) {
+    mobileMailAssistBrowserBtn.disabled = !pendingMobileComposeUrl && !pendingMobileMailtoUrl;
   }
 
   if (mobileMailAssistModal && typeof mobileMailAssistModal.showModal === 'function') {
@@ -1535,9 +1576,21 @@ function openMobileMailAssist(emailDraft = {}) {
     return true;
   }
 
-  const target = pendingMobileComposeUrl || pendingMobileMailtoUrl;
-  if (target) {
-    window.location.href = target;
+  const appTarget = String(pendingMobileAppComposeUrl || '').trim();
+  if (appTarget) {
+    const opened = window.open(appTarget, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      window.location.href = appTarget;
+    }
+    return true;
+  }
+
+  const browserTarget = String(pendingMobileComposeUrl || pendingMobileMailtoUrl || '').trim();
+  if (browserTarget) {
+    const opened = window.open(browserTarget, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      window.location.href = browserTarget;
+    }
     return true;
   }
   return false;
@@ -1569,14 +1622,19 @@ function openEmailDraftFromResponse(emailDraft = {}, preopenedWindow = null) {
   if (isMobile) {
     const mobileTarget = composeUrl || graphUrl || '';
     if (mobileTarget) {
-      // iOS/Android browsers handle same-tab navigation more reliably than popups for compose links.
-      window.location.href = mobileTarget;
+      const mobileWindow = window.open(mobileTarget, '_blank', 'noopener,noreferrer');
+      if (!mobileWindow) {
+        window.location.href = mobileTarget;
+      }
       return true;
     }
 
     const mailtoUrl = buildMailtoFallbackUrl(emailDraft);
     if (mailtoUrl) {
-      window.location.href = mailtoUrl;
+      const mobileWindow = window.open(mailtoUrl, '_blank', 'noopener,noreferrer');
+      if (!mobileWindow) {
+        window.location.href = mailtoUrl;
+      }
       return true;
     }
     return false;
@@ -2159,15 +2217,35 @@ if (mobileMailAssistCopyBtn) {
 
 if (mobileMailAssistOpenBtn) {
   mobileMailAssistOpenBtn.addEventListener('click', () => {
-    const targetUrl = String(pendingMobileComposeUrl || pendingMobileMailtoUrl || '').trim();
+    const targetUrl = String(pendingMobileAppComposeUrl || pendingMobileComposeUrl || pendingMobileMailtoUrl || '').trim();
     if (!targetUrl) {
-      showToast('Unable to open compose. Please copy body and open mail app manually.', 'error');
+      showToast('Unable to open Outlook app. Please copy body and use browser compose.', 'error');
       return;
     }
     if (mobileMailAssistModal?.open) {
       mobileMailAssistModal.close();
     }
-    window.location.href = targetUrl;
+    const opened = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      window.location.href = targetUrl;
+    }
+  });
+}
+
+if (mobileMailAssistBrowserBtn) {
+  mobileMailAssistBrowserBtn.addEventListener('click', () => {
+    const targetUrl = String(pendingMobileComposeUrl || pendingMobileMailtoUrl || '').trim();
+    if (!targetUrl) {
+      showToast('Browser compose is unavailable for this draft.', 'error');
+      return;
+    }
+    if (mobileMailAssistModal?.open) {
+      mobileMailAssistModal.close();
+    }
+    const opened = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      window.location.href = targetUrl;
+    }
   });
 }
 

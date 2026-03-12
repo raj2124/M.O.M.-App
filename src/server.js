@@ -162,6 +162,21 @@ function buildOutlookComposeUrlMobile({ to = '', cc = '', subject = '', body = '
   return buildOutlookComposeUrlDesktop({ to, cc, subject, body });
 }
 
+function buildOutlookAppComposeUrl({ to = '', cc = '', subject = '', body = '' }) {
+  const queryParts = [];
+  const trimmedTo = String(to || '').trim();
+  const trimmedCc = String(cc || '').trim();
+  if (trimmedTo) {
+    queryParts.push(`to=${encodeOutlookQueryComponent(trimmedTo)}`);
+  }
+  if (trimmedCc) {
+    queryParts.push(`cc=${encodeOutlookQueryComponent(trimmedCc)}`);
+  }
+  queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
+  queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
+  return `ms-outlook://compose?${queryParts.join('&')}`;
+}
+
 function buildEmailDraftPayload({ mom, options, pdfUrl, pdfFileName = '' }) {
   const to = String(options.emailTo || '').trim();
   const cc = String(options.emailCc || '').trim();
@@ -241,6 +256,7 @@ function buildOutlookDraftFromPayload(payload, warning = '') {
     pdfAbsoluteUrl: payload.pdfAbsoluteUrl,
     outlookComposeUrl: buildOutlookComposeUrlDesktop({ to, cc, subject, body }),
     outlookComposeMobileUrl: buildOutlookComposeUrlMobile({ to, cc, subject, body }),
+    outlookAppComposeUrl: buildOutlookAppComposeUrl({ to, cc, subject, body }),
     attachmentAutoSupported: false,
     attachmentNote:
       warning ||
@@ -287,6 +303,12 @@ async function buildEmailDraft({ mom, options, pdfUrl, pdfFileName = '' }) {
         body: payload.bodyText
       }),
       outlookComposeMobileUrl: buildOutlookComposeUrlMobile({
+        to: payload.to,
+        cc: payload.cc,
+        subject: payload.subject,
+        body: payload.bodyText
+      }),
+      outlookAppComposeUrl: buildOutlookAppComposeUrl({
         to: payload.to,
         cc: payload.cc,
         subject: payload.subject,
