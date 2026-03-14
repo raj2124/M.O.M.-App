@@ -1576,6 +1576,12 @@ function chooseMobileComposeTargets(emailDraft = {}) {
   const subject = String(emailDraft.subject || '').trim();
   const fullBody = String(emailDraft.body || '').trim();
   const compactBody = buildCompactMobileBody(emailDraft);
+  const compactBrowserComposeUrl = buildOutlookComposeUrlMobile({
+    to,
+    cc,
+    subject,
+    body: compactBody
+  });
 
   const browserCandidates = getOutlookComposeUrlCandidates(emailDraft);
   const browserComposeUrl = String(browserCandidates[0] || '').trim();
@@ -1590,6 +1596,15 @@ function chooseMobileComposeTargets(emailDraft = {}) {
       composeUrl: browserComposeUrl,
       mailtoUrl: '',
       reason: ''
+    };
+  }
+
+  if (compactBrowserComposeUrl && compactBrowserComposeUrl.length <= MAX_MOBILE_URL_LENGTH) {
+    return {
+      appComposeUrl: buildOutlookAppComposeUrl({ to, cc, subject, body: compactBody }),
+      composeUrl: compactBrowserComposeUrl,
+      mailtoUrl: '',
+      reason: 'Long draft content on mobile. Using compact Outlook compose body.'
     };
   }
 
@@ -1746,11 +1761,6 @@ function openEmailDraftFromResponse(emailDraft = {}, preopenedWindow = null) {
 
 function openDraftForCurrentDevice(emailDraft = {}, preopenedOutlookWindow = null) {
   const isMobile = isMobileDevice();
-  const mode = String(emailDraft.mode || '').trim().toLowerCase();
-
-  if (isMobile && mode === 'graph-draft') {
-    return openEmailDraftFromResponse(emailDraft, null);
-  }
   if (isMobile) {
     return openMobileMailAssist(emailDraft);
   }
