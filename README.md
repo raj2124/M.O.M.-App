@@ -81,6 +81,27 @@ npm run dev
   - `docs/DEPLOY_GODADDY_VPS.md`
   - `.github/workflows/deploy-vps.yml`
 
+## Graph Diagnostics API
+
+Use this endpoint to validate Graph configuration and pinpoint token/permission/mailbox issues without exposing secrets:
+
+```bash
+curl -sS "http://127.0.0.1:3000/api/graph/diagnostics"
+```
+
+Optional write probe (creates and deletes a test draft):
+
+```bash
+curl -sS "http://127.0.0.1:3000/api/graph/diagnostics?writeProbe=true"
+```
+
+The response includes:
+- configuration readiness flags (`enabled`, `isConfigured`, required fields present)
+- token status (`ok`, expiry, audience, roles/scopes, structured error)
+- mailbox access check
+- optional draft create/delete probe result
+- actionable `hints` for fixes (for 401/403 and permission gaps)
+
 ## License
 
 MIT (see `LICENSE`).

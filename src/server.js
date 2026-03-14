@@ -10,7 +10,8 @@ const { createRecordsStore } = require('./recordsStore');
 const {
   isGraphDraftConfigured,
   buildGraphBodyHtml,
-  createGraphDraft
+  createGraphDraft,
+  runGraphDiagnostics
 } = require('./graphMailService');
 
 const app = express();
@@ -362,6 +363,22 @@ app.get('/api/health', (_req, res) => {
     recordsRetentionDays: recordsStore.settings.retentionDays,
     recordsMaxCount: recordsStore.settings.maxCount
   });
+});
+
+app.get('/api/graph/diagnostics', async (req, res) => {
+  const writeProbe = String(req.query.writeProbe || '').toLowerCase() === 'true';
+  try {
+    const diagnostics = await runGraphDiagnostics(config, { writeProbe });
+    res.json({
+      success: true,
+      diagnostics
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Graph diagnostics failed.'
+    });
+  }
 });
 
 app.get('/api/zoho/projects', async (req, res) => {
