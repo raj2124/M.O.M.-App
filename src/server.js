@@ -173,7 +173,7 @@ function buildOutlookAppComposeUrl({ to = '', cc = '', subject = '', body = '' }
     queryParts.push(`cc=${encodeOutlookQueryComponent(trimmedCc)}`);
   }
   queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
-  queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
+  // Keep app URI minimal for mobile reliability; large body payloads can break app handoff.
   return `ms-outlook://compose?${queryParts.join('&')}`;
 }
 
@@ -321,7 +321,7 @@ async function buildEmailDraft({ mom, options, pdfUrl, pdfFileName = '' }) {
     console.error(`Graph draft creation failed: ${error.message}`);
     return buildOutlookDraftFromPayload(
       payload,
-      'Microsoft Graph draft is unavailable right now. Switched to Outlook deeplink fallback.'
+      `Microsoft Graph draft is unavailable right now (${error.message}). Switched to Outlook deeplink fallback.`
     );
   }
 }

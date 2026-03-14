@@ -1405,7 +1405,7 @@ function buildOutlookAppComposeUrl({ to = '', cc = '', subject = '', body = '' }
     queryParts.push(`cc=${encodeOutlookQueryComponent(trimmedCc)}`);
   }
   queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
-  queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
+  // Keep app URI minimal for mobile reliability; large body payloads can break app handoff.
   return `ms-outlook://compose?${queryParts.join('&')}`;
 }
 
