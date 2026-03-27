@@ -174,7 +174,6 @@ function buildOutlookAppComposeUrl({ to = '', cc = '', subject = '', body = '' }
     queryParts.push(`cc=${encodeOutlookQueryComponent(trimmedCc)}`);
   }
   queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
-  queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
   return `ms-outlook://compose?${queryParts.join('&')}`;
 }
 

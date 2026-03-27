@@ -1405,7 +1405,6 @@ function buildOutlookAppComposeUrl({ to = '', cc = '', subject = '', body = '' }
     queryParts.push(`cc=${encodeOutlookQueryComponent(trimmedCc)}`);
   }
   queryParts.push(`subject=${encodeOutlookQueryComponent(subject)}`);
-  queryParts.push(`body=${encodeOutlookQueryComponent(body)}`);
   return `ms-outlook://compose?${queryParts.join('&')}`;
 }
 
@@ -1707,41 +1706,10 @@ function openEmailDraftFromResponse(emailDraft = {}, preopenedWindow = null) {
   const graphUrl = String(emailDraft.outlookDraftWebUrl || '').trim();
   const openGraphWebLink = Boolean(emailDraft.openGraphWebLink);
   const candidates = getOutlookComposeUrlCandidates(emailDraft);
-  const composeUrl = String(candidates[0] || '').trim();
-  const isMobile = isMobileDevice();
 
   // Graph web links can fail if draft mailbox differs from the currently signed-in user.
   // Default behavior: open compose deeplink unless explicit opt-in is enabled server-side.
   const useGraphWebLink = mode === 'graph-draft' && graphUrl && openGraphWebLink;
-
-  if (isMobile) {
-    if (useGraphWebLink) {
-      const mobileWindow = window.open(graphUrl, '_blank', 'noopener,noreferrer');
-      if (!mobileWindow) {
-        window.location.href = graphUrl;
-      }
-      return true;
-    }
-
-    const mobileTarget = composeUrl || graphUrl || '';
-    if (mobileTarget) {
-      const mobileWindow = window.open(mobileTarget, '_blank', 'noopener,noreferrer');
-      if (!mobileWindow) {
-        window.location.href = mobileTarget;
-      }
-      return true;
-    }
-
-    const mailtoUrl = buildMailtoFallbackUrl(emailDraft);
-    if (mailtoUrl) {
-      const mobileWindow = window.open(mailtoUrl, '_blank', 'noopener,noreferrer');
-      if (!mobileWindow) {
-        window.location.href = mailtoUrl;
-      }
-      return true;
-    }
-    return false;
-  }
 
   if (useGraphWebLink) {
     const targetWindow = preopenedWindow && !preopenedWindow.closed
@@ -1760,10 +1728,6 @@ function openEmailDraftFromResponse(emailDraft = {}, preopenedWindow = null) {
 }
 
 function openDraftForCurrentDevice(emailDraft = {}, preopenedOutlookWindow = null) {
-  const isMobile = isMobileDevice();
-  if (isMobile) {
-    return openMobileMailAssist(emailDraft);
-  }
   return openEmailDraftFromResponse(emailDraft, preopenedOutlookWindow);
 }
 
@@ -2388,7 +2352,7 @@ confirmRecordExportBtn.addEventListener('click', async () => {
   const needsPdfWindow = Boolean(options.printPdf || (options.generatePdf && !options.sendEmail));
   const preopenedPdfWindow = needsPdfWindow ? window.open('about:blank', '_blank') : null;
   const preopenedOutlookWindow =
-    options.sendEmail && !isMobileDevice() ? window.open('about:blank', '_blank') : null;
+    options.sendEmail ? window.open('about:blank', '_blank') : null;
 
   try {
     if (options.sendEmail) {
@@ -2483,7 +2447,7 @@ confirmSubmitBtn.addEventListener('click', async () => {
   const needsPdfWindow = Boolean(options.printPdf || (options.generatePdf && !options.sendEmail));
   const preopenedPdfWindow = needsPdfWindow ? window.open('about:blank', '_blank') : null;
   const preopenedOutlookWindow =
-    options.sendEmail && !isMobileDevice() ? window.open('about:blank', '_blank') : null;
+    options.sendEmail ? window.open('about:blank', '_blank') : null;
 
   try {
     const response = await fetch('/api/mom/submit', {
