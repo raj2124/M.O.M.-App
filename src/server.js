@@ -10,6 +10,7 @@ const {
   getProjectClientUsers,
   getProjectTasks,
   postTaskComment,
+  attachFileToTask,
   runZohoDiagnostics
 } = require('./zohoClient');
 const { sanitizeMomPayload, validateMomPayload } = require('./momTemplate');
@@ -472,6 +473,56 @@ function getRecordById(recordId) {
   return (Array.isArray(records) ? records.find((item) => String(item.id || '') === targetId) : null) || null;
 }
 
+async function attachRecordPdfToZohoTasks(record) {
+  if (!record) {
+    throw new Error('Record not found.');
+  }
+
+  const projectSource = String(record.projectSource || '').trim().toLowerCase();
+  if (projectSource !== 'zoho') {
+    throw new Error('This record is not linked to a Zoho project.');
+  }
+
+  const zohoProjectId = String(record.zohoProjectId || '').trim();
+  if (!zohoProjectId) {
+    throw new Error('Zoho project ID is missing on this record.');
+  }
+
+  const pdfFileName = path.basename(String(record.pdfFileName || '').trim());
+  if (!pdfFileName) {
+    throw new Error('Generated PDF file name is missing on this record.');
+  }
+
+  const pdfFilePath = path.join(config.app.generatedDir, pdfFileName);
+  if (!fs.existsSync(pdfFilePath)) {
+    throw new Error('Generated PDF file could not be found on the server.');
+  }
+
+  const targetTasks = getZohoCommentTargetTasks({
+    taskRows: Array.isArray(record.taskRows) ? record.taskRows : []
+  });
+  if (!targetTasks.length) {
+    throw new Error('No Zoho tasks are associated with this record.');
+  }
+
+  const attachedTasks = [];
+  for (const task of targetTasks) {
+    const attachment = await attachFileToTask(zohoProjectId, task.taskId, pdfFilePath, pdfFileName);
+    attachedTasks.push({
+      srNo: task.srNo,
+      taskId: task.taskId,
+      taskName: task.taskName,
+      attachmentId: attachment.id,
+      fileName: attachment.fileName
+    });
+  }
+
+  return {
+    attempted: true,
+    attachedTasks
+  };
+}
+
 app.get('/api/health', (_req, res) => {
   const zohoAutoRefreshConfigured = Boolean(
     config.zoho.refreshToken && config.zoho.clientId && config.zoho.clientSecret
@@ -770,6 +821,37 @@ app.post('/api/mom/records/:recordId/email-draft', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to build email draft for record.'
+    });
+  }
+});
+
+app.post('/api/mom/records/:recordId/zoho-attach-pdf', async (req, res) => {
+  try {
+    const recordId = String(req.params.recordId || '').trim();
+    const record = getRecordById(recordId);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: 'Record not found.'
+      });
+    }
+
+    const zohoTaskAttachmentSync = await attachRecordPdfToZohoTasks(record);
+
+    const { record: updatedRecord } = recordsStore.updateRecord(record.id, {
+      zohoTaskAttachmentSync: zohoTaskAttachmentSync.attachedTasks
+    });
+
+    return res.json({
+      success: true,
+      message: 'M.O.M PDF attached to Zoho task(s) successfully.',
+      zohoTaskAttachmentSync,
+      record: updatedRecord || record
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to attach PDF to Zoho task(s).'
     });
   }
 });

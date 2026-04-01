@@ -2030,6 +2030,9 @@ function renderRecordsTable(records) {
     const tr = document.createElement('tr');
     const pdfUrl = String(record.pdfUrl || '').trim();
     const daysLeft = getRecordDaysLeft(record);
+    const canAttachZohoPdf =
+      String(record.projectSource || '').trim().toLowerCase() === 'zoho' &&
+      Boolean(String(record.pdfFileName || '').trim());
     const pdfLink = pdfUrl
       ? `<a class="record-pdf-link" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener">Open PDF</a>`
       : '-';
@@ -2044,10 +2047,19 @@ function renderRecordsTable(records) {
       <td class="record-output-cell">${getRecordOutputBadges(record)}</td>
       <td>${pdfLink}</td>
       <td class="record-actions-cell">
+        ${
+          canAttachZohoPdf
+            ? '<button type="button" class="btn btn-light record-zoho-attach-btn">Attach PDF in Zoho</button>'
+            : ''
+        }
         <button type="button" class="btn btn-light record-export-btn">Re-export</button>
         <button type="button" class="btn btn-light record-delete-btn">Delete</button>
       </td>
     `;
+
+    tr.querySelector('.record-zoho-attach-btn')?.addEventListener('click', () => {
+      attachRecordPdfToZoho(record);
+    });
 
     tr.querySelector('.record-export-btn')?.addEventListener('click', () => {
       openRecordExportModal(record);
@@ -2058,6 +2070,43 @@ function renderRecordsTable(records) {
     });
 
     recordsTableBody.appendChild(tr);
+  }
+}
+
+async function attachRecordPdfToZoho(record) {
+  if (!record) {
+    showToast('Record not found for Zoho attachment.', 'error');
+    return;
+  }
+
+  const ok = window.confirm(
+    'This will upload the generated M.O.M PDF into all selected Zoho task rows saved with this record. Continue?'
+  );
+  if (!ok) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/mom/records/${encodeURIComponent(record.id)}/zoho-attach-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Failed to attach PDF in Zoho.');
+    }
+
+    const attachedCount = Array.isArray(data.zohoTaskAttachmentSync?.attachedTasks)
+      ? data.zohoTaskAttachmentSync.attachedTasks.length
+      : 0;
+    showToast(`Attached PDF to ${attachedCount} Zoho task(s).`);
+    loadRecords(recordsSearchInput.value.trim(), { silent: true });
+  } catch (error) {
+    showToast(error.message || 'Failed to attach PDF in Zoho.', 'error');
   }
 }
 

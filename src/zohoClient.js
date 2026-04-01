@@ -1,4 +1,5 @@
 const axios = require('axios');
+const fs = require('fs');
 const config = require('./config');
 
 const mockProjects = [
@@ -862,6 +863,24 @@ async function requestZohoPost(url, data = {}, params = {}, allowRetry = true) {
   }
 }
 
+async function requestZohoMultipartPost(url, createFormData, allowRetry = true) {
+  const formData = typeof createFormData === 'function' ? createFormData() : createFormData;
+  try {
+    return await axios.post(url, formData, {
+      headers: {
+        Authorization: `Zoho-oauthtoken ${currentAccessToken}`
+      },
+      timeout: 20000
+    });
+  } catch (error) {
+    if (allowRetry && isAxiosStatus(error, 401) && hasRefreshCredentials()) {
+      await refreshZohoAccessToken();
+      return requestZohoMultipartPost(url, createFormData, false);
+    }
+    throw error;
+  }
+}
+
 async function fetchProjectDetailFromZoho(projectId) {
   await ensureZohoCredentials();
   const projectBase = buildZohoProjectsBasePath();
@@ -1549,6 +1568,85 @@ async function postTaskComment(projectRef, taskId, content) {
   throw new Error(toZohoErrorMessage(lastError));
 }
 
+async function attachFileToTask(projectRef, taskId, filePath, fileName = '') {
+  const normalizedProjectRef = String(projectRef || '').trim();
+  const normalizedTaskId = String(taskId || '').trim();
+  const normalizedFilePath = String(filePath || '').trim();
+  const normalizedFileName = String(fileName || '').trim() || 'MOM.pdf';
+
+  if (!normalizedProjectRef) {
+    throw new Error('Project ID is required to attach a file to a Zoho task.');
+  }
+  if (!normalizedTaskId) {
+    throw new Error('Task ID is required to attach a file to a Zoho task.');
+  }
+  if (!normalizedFilePath || !fs.existsSync(normalizedFilePath)) {
+    throw new Error('Generated PDF file is unavailable for Zoho task attachment.');
+  }
+
+  if (config.zoho.useMock) {
+    return {
+      id: `mock-attachment-${normalizedTaskId}-${Date.now()}`,
+      fileName: normalizedFileName,
+      taskId: normalizedTaskId
+    };
+  }
+
+  await ensureZohoCredentials();
+  const resolvedProjectId = await resolveProjectReferenceToId(normalizedProjectRef);
+  const restBase = buildZohoProjectsBasePath();
+  const createFormData = () => {
+    const buffer = fs.readFileSync(normalizedFilePath);
+    const fileBlob = new Blob([buffer], { type: 'application/pdf' });
+    const form = new FormData();
+    form.append('uploaddoc', fileBlob, normalizedFileName);
+    return form;
+  };
+
+  const candidates = [
+    `${restBase}/${resolvedProjectId}/tasks/${normalizedTaskId}/attachments/`,
+    `${restBase}/${resolvedProjectId}/tasks/${normalizedTaskId}/attachments`
+  ];
+
+  let lastError = null;
+  for (const url of candidates) {
+    try {
+      const response = await requestZohoMultipartPost(url, createFormData, true);
+      const attachments =
+        response?.data?.attachments ||
+        response?.data?.documents ||
+        response?.data?.files ||
+        response?.data?.attachment ||
+        [];
+      const attachment = Array.isArray(attachments) ? attachments[0] || {} : attachments;
+      return {
+        id: String(
+          attachment.id_string ||
+            attachment.id ||
+            attachment.docid ||
+            attachment.file_id ||
+            ''
+        ).trim(),
+        fileName: String(
+          attachment.name ||
+            attachment.filename ||
+            attachment.file_name ||
+            normalizedFileName
+        ).trim(),
+        taskId: normalizedTaskId,
+        projectId: resolvedProjectId
+      };
+    } catch (error) {
+      lastError = error;
+      if (!isAxiosStatus(error, 400) && !isAxiosStatus(error, 404)) {
+        throw new Error(toZohoErrorMessage(error));
+      }
+    }
+  }
+
+  throw new Error(toZohoErrorMessage(lastError));
+}
+
 async function runZohoDiagnostics(options = {}) {
   const writeProbe = String(options.writeProbe || '').toLowerCase() === 'true' || options.writeProbe === true;
   const projectId = String(options.projectId || '').trim();
@@ -1709,5 +1807,6 @@ module.exports = {
   getProjectClientUsers,
   getProjectTasks,
   postTaskComment,
+  attachFileToTask,
   runZohoDiagnostics
 };

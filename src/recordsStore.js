@@ -200,10 +200,51 @@ function createRecordsStore(config) {
     };
   }
 
+  function updateRecord(recordId, updates = {}) {
+    const cleaned = persistCleanup();
+    const targetId = String(recordId || '').trim();
+    if (!targetId) {
+      return {
+        updated: false,
+        record: null,
+        removed: cleaned.removed
+      };
+    }
+
+    let updatedRecord = null;
+    const nextRecords = cleaned.records.map((record) => {
+      if (String(record.id || '') !== targetId) {
+        return record;
+      }
+
+      updatedRecord = {
+        ...record,
+        ...updates
+      };
+      return updatedRecord;
+    });
+
+    if (!updatedRecord) {
+      return {
+        updated: false,
+        record: null,
+        removed: cleaned.removed
+      };
+    }
+
+    writeAll(nextRecords);
+    return {
+      updated: true,
+      record: updatedRecord,
+      removed: cleaned.removed
+    };
+  }
+
   return {
     listRecords,
     addRecord,
     deleteRecord,
+    updateRecord,
     settings: {
       retentionDays,
       maxCount
