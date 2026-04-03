@@ -81,7 +81,7 @@ To enable Scan & Autofill:
 
 - Set `GEMINI_ENABLED=true`
 - Set `GEMINI_API_KEY`
-- Optional: set `GEMINI_MODEL` (default: `gemini-2.5-flash`)
+- Optional: set `GEMINI_MODEL` (default: `gemini-2.5-pro`)
 - Optional: set `GEMINI_MAX_UPLOAD_BYTES` (default: `15728640`, about 15 MB)
 
 Supported upload formats:
